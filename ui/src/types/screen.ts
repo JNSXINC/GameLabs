@@ -1,0 +1,1 @@
+export type Screen = "library" | "favorites" | "browse" | "settings" | "user";

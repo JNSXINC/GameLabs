@@ -1,0 +1,1 @@
+validateLicense.ts

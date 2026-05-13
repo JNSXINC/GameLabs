@@ -1,0 +1,1 @@
+detectHardware.ts
