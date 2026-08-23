@@ -14,7 +14,9 @@ export function useGameValidation(games: Game[]) {
 
             for (const game of games) {
                 const fileToCheck =
-                    game.launchType === "emulator" ? game.gameFilePath : game.path;
+                    game.launchType === "emulator"
+                        ? game.gameFilePath
+                        : game.executablePath || game.path;
 
                 if (!fileToCheck) {
                     statusMap[game.id] = "none";
@@ -22,6 +24,7 @@ export function useGameValidation(games: Game[]) {
                 }
 
                 const result = await window.electronAPI.checkGamePath(fileToCheck);
+
                 statusMap[game.id] = result.exists ? "valid" : "invalid";
             }
 

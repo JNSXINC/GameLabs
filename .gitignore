@@ -4,3 +4,7 @@ dist-electron
 out
 .vscode
 *.log
+Emulators/
+data/cache/
+data/temp/
+controlls_config/

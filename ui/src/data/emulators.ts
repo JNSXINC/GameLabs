@@ -6,6 +6,7 @@ export const emulators: Emulator[] = [
         name: "PCSX2",
         executablePath: "",
         platforms: ["ps2"],
+
         biosPath: "",
         biosRequired: false,
         biosConfigured: false,
@@ -16,11 +17,41 @@ export const emulators: Emulator[] = [
     },
 
     {
+        id: "ppsspp",
+        name: "PPSSPP",
+        executablePath: "",
+        platforms: ["psp"],
+
+        biosPath: "",
+
+        defaultArgs: [],
+
+        installed: false,
+
+        biosRequired: false,
+    },
+
+    {
+        id: "duckstation",
+        name: "DuckStation",
+        executablePath: "",
+        platforms: ["ps1"],
+
+        biosPath: "",
+
+        defaultArgs: [],
+
+        installed: false,
+
+        biosRequired: false,
+    },
+
+    {
         id: "retroarch",
         name: "RetroArch",
         executablePath: "",
 
-        platforms: ["snes", "gba", "ps1"],
+        platforms: ["snes", "nes", "gba", "genesis", "arcade"],
 
         biosPath: "",
 

@@ -24,6 +24,10 @@ export default function GameCard({
 }: GameCardProps) {
   const isLibrary = variant === "library";
 
+  const coverSrc = game.cover?.startsWith("data:image")
+    ? game.cover
+    : assetUrl(game.cover);
+
   return (
     <div
       onMouseEnter={onHover}
@@ -61,7 +65,7 @@ export default function GameCard({
       }}
     >
       <img
-        src={assetUrl(game.cover)}
+        src={coverSrc}
         alt={game.name}
         style={{
           width: "100%",

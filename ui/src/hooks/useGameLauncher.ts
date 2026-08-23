@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import { Emulator } from "../types/emulator";
 import { Game } from "../types/game";
 import { GameStatus } from "./useGameValidation";
@@ -14,6 +15,7 @@ type Params = {
     emulators?: Emulator[];
     setScreen: (screen: "library") => void;
     setSelected: (value: number) => void;
+    setGames: React.Dispatch<React.SetStateAction<Game[]>>;
 };
 
 export function useGameLauncher({
@@ -22,13 +24,39 @@ export function useGameLauncher({
     emulators = [],
     setScreen,
     setSelected,
+    setGames,
 }: Params) {
     const [isLaunching, setIsLaunching] = useState(false);
     const [lastPlayedGameId, setLastPlayedGameId] = useState<string | null>(null);
+    const [launchStartTime, setLaunchStartTime] = useState<number | null>(null);
 
     useEffect(() => {
         const unsubscribe = window.electronAPI.onGameClosed(() => {
             setIsLaunching(false);
+
+            if (lastPlayedGameId && launchStartTime) {
+                const playedMs = Date.now() - launchStartTime;
+                const playedHours = playedMs / 1000 / 60 / 60;
+
+                setGames((prev) => {
+                    const updatedGames = prev.map((game) =>
+                        game.id === lastPlayedGameId
+                            ? {
+                                ...game,
+                                playtime:
+                                    Number(game.playtime || 0) + playedHours,
+                            }
+                            : game
+                    );
+
+                    window.electronAPI.saveLibrary(updatedGames);
+
+                    return updatedGames;
+                });
+
+                setLaunchStartTime(null);
+            }
+
             setScreen("library");
 
             if (lastPlayedGameId) {
@@ -43,19 +71,28 @@ export function useGameLauncher({
         });
 
         return unsubscribe;
-    }, [lastPlayedGameId, filteredLibraryGames, setScreen, setSelected]);
+    }, [
+        lastPlayedGameId,
+        launchStartTime,
+        filteredLibraryGames,
+        setScreen,
+        setSelected,
+        setGames,
+    ]);
 
     const getCompatibleEmulator = (game: Game) => {
         if (!game.platform) return null;
 
         return (
             emulators.find((emulator) =>
-                emulator.platforms.includes(game.platform!)
+                emulator.platforms.includes(game.platform as any)
             ) || null
         );
     };
 
-    const launchPcGame = async (game: Game): Promise<LaunchResult | undefined> => {
+    const launchPcGame = async (
+        game: Game
+    ): Promise<LaunchResult | undefined> => {
         const status = gameStatus[game.id];
 
         if (status === "none") {
@@ -68,12 +105,18 @@ export function useGameLauncher({
             return;
         }
 
-        if (!game.path) {
+        const executablePath = game.executablePath || game.path;
+
+        if (!executablePath) {
             alert("Caminho do executável não encontrado.");
             return;
         }
 
-        return window.electronAPI.launchGame(game.path);
+        return window.electronAPI.launchGame({
+            ...game,
+            launchType: "pc",
+            executablePath,
+        });
     };
 
     const launchEmulatedGame = async (
@@ -91,6 +134,16 @@ export function useGameLauncher({
             return;
         }
 
+        const emulatorExecutablePath = emulator.executablePath;
+
+        if (
+            typeof emulatorExecutablePath !== "string" ||
+            !emulatorExecutablePath.trim()
+        ) {
+            alert(`Executável do ${emulator.name} inválido.`);
+            return;
+        }
+
         if (emulator.biosRequired && !emulator.biosConfigured) {
             alert(`Configure a BIOS do ${emulator.name} em Settings.`);
             return;
@@ -101,35 +154,62 @@ export function useGameLauncher({
             return;
         }
 
-        return window.electronAPI.launchGame(emulator.executablePath, [
-            ...(emulator.defaultArgs || []),
-            game.gameFilePath,
-        ]);
+        return window.electronAPI.launchGame({
+            ...game,
+            launchType: "emulator",
+            emulatorId: game.emulatorId || emulator.id,
+            gameFilePath: game.gameFilePath,
+            emulatorExecutablePath,
+        });
     };
 
     const handleLaunchGame = async (game: Game | null) => {
         if (!game) return;
 
+        const now = Date.now();
+
         setIsLaunching(true);
         setLastPlayedGameId(game.id);
+        setLaunchStartTime(now);
+
+        setGames((prev) => {
+            const updatedGames = prev.map((item) =>
+                item.id === game.id
+                    ? { ...item, lastPlayed: now }
+                    : item
+            );
+
+            window.electronAPI.saveLibrary(updatedGames);
+
+            return updatedGames;
+        });
 
         try {
-            const result: LaunchResult | undefined =
-                game.launchType === "emulator"
-                    ? await launchEmulatedGame(game)
-                    : await launchPcGame(game);
+            const isEmulatorGame =
+                !!game.gameFilePath || game.launchType === "emulator";
+
+            const result: LaunchResult | undefined = isEmulatorGame
+                ? await launchEmulatedGame(game)
+                : await launchPcGame(game);
 
             if (!result) {
                 setIsLaunching(false);
+                setLaunchStartTime(null);
                 return;
             }
 
             if (!result.success) {
                 setIsLaunching(false);
+                setLaunchStartTime(null);
+
                 alert(`Falha ao iniciar: ${result.error}`);
             }
-        } catch {
+        } catch (error) {
+            console.error(error);
+
             setIsLaunching(false);
+            setLaunchStartTime(null);
+
             alert("Erro inesperado ao iniciar o jogo.");
         }
     };

@@ -8,9 +8,32 @@ export function useGamePersistence(games: Game[], setGames: React.Dispatch<React
     useEffect(() => {
         const saved = localStorage.getItem(GAMES_KEY);
 
-        if (saved) {
-            setGames(JSON.parse(saved));
-        }
+        if (!saved) return;
+
+        const parsedGames = JSON.parse(saved);
+
+        const normalizedGames = parsedGames.map((game: Game) => {
+            if (
+                !game.controllerProfileId ||
+                game.controllerProfileId === "default"
+            ) {
+                if (game.platform && game.platform !== "windows") {
+                    return {
+                        ...game,
+                        controllerProfileId: game.platform,
+                    };
+                }
+
+                return {
+                    ...game,
+                    controllerProfileId: "pc",
+                };
+            }
+
+            return game;
+        });
+
+        setGames(normalizedGames);
     }, [setGames]);
 
     useEffect(() => {

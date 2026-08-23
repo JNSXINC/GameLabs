@@ -1,1 +1,1 @@
-metadataResolver.ts
+export { };

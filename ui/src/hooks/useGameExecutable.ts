@@ -19,13 +19,32 @@ export function useGameExecutable({ setGames }: Params) {
     };
 
     const removeGameExecutable = (id: string) => {
-        setGames((prev) =>
-            prev.map((game) => (game.id === id ? { ...game, path: "" } : game))
-        );
-    };
+        setGames((prev) => {
+            const updatedGames = prev.map((game) =>
+                game.id === id
+                    ? {
+                        ...game,
+                        path: "",
+                        executablePath: "",
+                    }
+                    : game
+            );
 
+            window.electronAPI.saveLibrary(updatedGames);
+
+            return updatedGames;
+        });
+    };
     const handleRemoveGameFromSystem = (gameId: string) => {
-        setGames((prev) => prev.filter((game) => game.id !== gameId));
+        setGames((prev) => {
+            const updatedGames = prev.filter(
+                (game) => game.id !== gameId
+            );
+
+            window.electronAPI.saveLibrary(updatedGames);
+
+            return updatedGames;
+        });
     };
 
     const setGameExecutable = async (id: string) => {
@@ -33,11 +52,21 @@ export function useGameExecutable({ setGames }: Params) {
 
         if (result.canceled || !result.path) return;
 
-        setGames((prev) =>
-            prev.map((game) =>
-                game.id === id ? { ...game, path: result.path || "" } : game
-            )
-        );
+        setGames((prev) => {
+            const updatedGames = prev.map((game) =>
+                game.id === id
+                    ? {
+                        ...game,
+                        path: result.path || "",
+                        executablePath: result.path || "",
+                    }
+                    : game
+            );
+
+            window.electronAPI.saveLibrary(updatedGames);
+
+            return updatedGames;
+        });
     };
 
     return {

@@ -5,33 +5,91 @@ export { };
 declare global {
   interface Window {
     electronAPI: {
-      launchGame: (
-        gamePath: string,
-        args?: string[]
-      ) => Promise<{
+
+      loadLibrary: () => Promise<Game[]>;
+
+      saveLibrary: (games: Game[]) => Promise<{ success: boolean }>;
+
+      addGameToLibrary: (game: Game) => Promise<Game>;
+
+      updateGameInLibrary: (
+        gameId: string,
+        patch: Partial<Game>
+      ) => Promise<{ success: boolean }>;
+
+      removeGameFromLibrary: (
+        gameId: string
+      ) => Promise<{ success: boolean }>;
+
+      launchGame: (game: unknown) => Promise<{
         success: boolean;
         error?: string;
       }>;
+
       selectGameExecutable: () => Promise<{
         canceled: boolean;
         path: string | null;
       }>;
+
       selectGameFile: () => Promise<{
         canceled: boolean;
         path: string | null;
       }>;
+
+      checkGamePath: (path: string) => Promise<{
+        exists: boolean;
+      }>;
+
+      openGameFolder: (gamePath: string) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+
+      scanGamesFromFolder: () => Promise<any[]>;
+
       selectBiosFile: () => Promise<{
         canceled: boolean;
         path: string | null;
       }>;
-      checkGamePath: (path: string) => Promise<{
-        exists: boolean;
-      }>;
-      openGameFolder: (path: string) => Promise<{
+
+      listBios: () => Promise<
+        {
+          platform: string;
+          name: string;
+          path?: string;
+          required: boolean;
+          status: "configured" | "partial" | "missing" | "not_required";
+          regions?: {
+            region: "usa" | "japan" | "europe";
+            name: string;
+            biosHint?: string;
+            path?: string;
+            status: "configured" | "missing";
+          }[];
+        }[]
+      >;
+
+      selectBios: (
+        platform: string,
+        region?: string
+      ) => Promise<string | null>;
+
+      openBiosFolder: (
+        biosPath?: string
+      ) => Promise<void>;
+
+      downloadEmulator: (
+        emulatorId: string
+      ) => Promise<{
         success: boolean;
-        error?: string;
+        emulatorId: string;
+        name?: string;
+        installDir?: string;
+        executablePath?: string;
       }>;
-      scanGamesFromFolder: () => Promise<ScannedGame[]>;
+
+      searchSteamGridGame: (gameName: string) => Promise<any>;
+
       onGameClosed: (callback: () => void) => () => void;
     };
   }

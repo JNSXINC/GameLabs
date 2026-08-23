@@ -1,4 +1,4 @@
-import { Platform } from "./game";
+import type { Platform } from "./platform";
 
 export type Emulator = {
     id: string;

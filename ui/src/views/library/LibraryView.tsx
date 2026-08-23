@@ -1,9 +1,11 @@
 import React from "react";
 import { Game } from "../../types/game";
 import GameCard from "../../components/game/GameCard";
+import { formatPlaytime } from "../../utils/formatPlaytime";
 
 type LibraryViewProps = {
   currentLibraryGame: Game | null;
+  recentGames: Game[];
   infiniteLibraryGames: Game[];
   realIndex: number;
   infiniteCenterOffset: number;
@@ -17,6 +19,7 @@ type LibraryViewProps = {
 
 export default function LibraryView({
   currentLibraryGame,
+  recentGames,
   infiniteLibraryGames,
   realIndex,
   infiniteCenterOffset,
@@ -44,12 +47,16 @@ export default function LibraryView({
     );
   }
 
+  const bgSrc = currentLibraryGame.bg?.startsWith("data:image")
+    ? currentLibraryGame.bg
+    : assetUrl(currentLibraryGame.bg);
+
   return (
     <div
       style={{
         minHeight: "100vh",
         color: "white",
-        backgroundImage: `linear-gradient(rgba(5,10,20,0.45), rgba(5,10,20,0.88)), url("${assetUrl(currentLibraryGame.bg)}")`,
+        backgroundImage: `linear-gradient(rgba(5,10,20,0.45), rgba(5,10,20,0.88)), url("${bgSrc}")`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
@@ -114,7 +121,7 @@ export default function LibraryView({
               opacity: 0.72,
             }}
           >
-            ⏱ Played {currentLibraryGame.playtime}h
+            ⏱ Played {formatPlaytime(currentLibraryGame.playtime)}
           </p>
 
           <div
@@ -162,6 +169,84 @@ export default function LibraryView({
               Options
             </button>
           </div>
+
+          {recentGames.length > 0 && (
+            <div style={{ marginTop: "34px" }}>
+              <h2
+                style={{
+                  fontSize: "20px",
+                  margin: "0 0 14px",
+                  opacity: 0.92,
+                }}
+              >
+                Continue jogando
+              </h2>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "14px",
+                  overflowX: "auto",
+                  paddingBottom: "10px",
+                  maxWidth: "760px",
+                }}
+              >
+                {recentGames.map((game) => {
+                  const coverSrc = game.cover?.startsWith("data:image")
+                    ? game.cover
+                    : assetUrl(game.cover);
+
+                  return (
+                    <div
+                      key={game.id}
+                      onClick={() => handleLaunchGame(game)}
+                      style={{
+                        width: "110px",
+                        flexShrink: 0,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "150px",
+                          borderRadius: "12px",
+                          overflow: "hidden",
+                          background: "#000",
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          boxShadow: "0 10px 24px rgba(0,0,0,0.28)",
+                        }}
+                      >
+                        <img
+                          src={coverSrc}
+                          alt={game.name}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            display: "block",
+                          }}
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          marginTop: "8px",
+                          opacity: 0.85,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                        title={game.name}
+                      >
+                        {game.name}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

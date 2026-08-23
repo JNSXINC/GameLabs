@@ -1,6 +1,8 @@
 import React from "react";
 import { Emulator } from "../../types/emulator";
 import EmulatorSettings from "./emulators/EmulatorSettings";
+import ControllerSettings from "./controls/ControllerSettings";
+
 
 type Props = {
     emulators: Emulator[];
@@ -43,6 +45,22 @@ export default function SettingsView({
                     setEmulators={setEmulators}
                     setEmulatorExecutable={setEmulatorExecutable}
                 />
+
+                <hr
+                    style={{
+                        margin: "24px 0",
+                        borderColor: "rgba(255,255,255,0.08)",
+                    }}
+                />
+
+                <hr
+                    style={{
+                        margin: "24px 0",
+                        borderColor: "rgba(255,255,255,0.08)",
+                    }}
+                />
+
+                <ControllerSettings />
             </div>
         </div>
     );

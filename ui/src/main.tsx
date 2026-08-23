@@ -17,14 +17,17 @@ import { useGameExecutable } from "./hooks/useGameExecutable";
 import { useEmulators } from "./hooks/useEmulators";
 import { useGameFiles } from "./hooks/useGameFiles";
 import { useGameImport } from "./hooks/useGameImport";
+import { resolveGameMetadata } from "./services/metadata/metadataResolver";
 
 import { Screen } from "./types/screen";
-
 import { Game } from "./types/game";
-import { ScannedGame } from "./types/scanner";
+import type { ScannedGame } from "./types/scanner";
 
 const SCREEN_KEY = "gamelabs_screen";
 const SEARCH_KEY = "gamelabs_search";
+const SORT_KEY = "gamelabs_sort_mode";
+
+type SortMode = "az" | "za" | "platform" | "favorites";
 
 const assetUrl = (value: string) => {
   if (!value) return "";
@@ -32,26 +35,114 @@ const assetUrl = (value: string) => {
   return `${import.meta.env.BASE_URL}${value.replace(/^\/+/, "")}`;
 };
 
+function sortGames(games: Game[], sortMode: SortMode) {
+  const result = [...games];
+
+  switch (sortMode) {
+    case "az":
+      result.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+
+    case "za":
+      result.sort((a, b) => b.name.localeCompare(a.name));
+      break;
+
+    case "platform":
+      result.sort((a, b) =>
+        (a.platform || "").localeCompare(b.platform || "")
+      );
+      break;
+
+    case "favorites":
+      result.sort((a, b) => {
+        if (a.favorite === b.favorite) return a.name.localeCompare(b.name);
+        return a.favorite ? -1 : 1;
+      });
+      break;
+  }
+
+  return result;
+}
+
+function SortSelector({
+  sortMode,
+  setSortMode,
+}: {
+  sortMode: SortMode;
+  setSortMode: React.Dispatch<React.SetStateAction<SortMode>>;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 16,
+      }}
+    >
+      <span style={{ color: "#fff", opacity: 0.75, fontSize: 13 }}>
+        Ordenar:
+      </span>
+
+      <select
+        value={sortMode}
+        onChange={(e) => setSortMode(e.target.value as SortMode)}
+        style={{
+          padding: "8px 10px",
+          borderRadius: 8,
+          background: "#111827",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.14)",
+        }}
+      >
+        <option value="az">A-Z</option>
+        <option value="za">Z-A</option>
+        <option value="platform">Plataforma</option>
+        <option value="favorites">Favoritos primeiro</option>
+      </select>
+    </div>
+  );
+}
+
 function App() {
-  const {
-    games,
-    setGames,
-    favorites,
-    toggleFavorite,
-  } = useFavorites(
+
+  const [showSplash, setShowSplash] = useState(true);
+
+  const { games, setGames, favorites, toggleFavorite } = useFavorites(
     (baseGames as Game[]).map((game) => ({
       ...game,
       path: game.path || "",
     }))
   );
 
+  useEffect(() => {
+    async function loadSavedLibrary() {
+      try {
+        const savedGames = await window.electronAPI.loadLibrary();
+
+        if (Array.isArray(savedGames) && savedGames.length > 0) {
+          setGames(savedGames);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar biblioteca:", error);
+      }
+    }
+
+    loadSavedLibrary();
+  }, [setGames]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   const { importGameFile } = useGameImport({ setGames });
 
-  const {
-    emulators,
-    setEmulators,
-    setEmulatorExecutable,
-  } = useEmulators();
+  const { emulators, setEmulators, setEmulatorExecutable } = useEmulators();
 
   const { gameStatus } = useGameValidation(games);
 
@@ -65,7 +156,6 @@ function App() {
   } = useGameExecutable({ setGames });
 
   const { setGameFile } = useGameFiles({ setGames });
-
 
   const [screen, setScreen] = useState<Screen>(() => {
     try {
@@ -97,27 +187,74 @@ function App() {
     }
   });
 
+  const [sortMode, setSortMode] = useState<SortMode>(() => {
+    try {
+      const saved = localStorage.getItem(SORT_KEY) as SortMode | null;
+
+      if (
+        saved === "az" ||
+        saved === "za" ||
+        saved === "platform" ||
+        saved === "favorites"
+      ) {
+        return saved;
+      }
+
+      return "az";
+    } catch {
+      return "az";
+    }
+  });
+
   const [favoritesMenuId, setFavoritesMenuId] = useState<string | null>(null);
   const [browseMenuId, setBrowseMenuId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const onUpdateGame = async (gameId: string, patch: Partial<Game>) => {
+    setGames((prevGames) => {
+      const updatedGames = prevGames.map((game) =>
+        game.id === gameId ? { ...game, ...patch } : game
+      );
+
+      window.electronAPI.saveLibrary(updatedGames);
+
+      return updatedGames;
+    });
+  };
+
   const filteredBrowseGames = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return games;
-    return games.filter((g) => g.name.toLowerCase().includes(term));
-  }, [games, search]);
+
+    const filtered = !term
+      ? games
+      : games.filter((g) => g.name.toLowerCase().includes(term));
+
+    return sortGames(filtered, sortMode);
+  }, [games, search, sortMode]);
 
   const filteredLibraryGames = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return games;
-    return games.filter((g) => g.name.toLowerCase().includes(term));
-  }, [games, search]);
+
+    const filtered = !term
+      ? games
+      : games.filter((g) => g.name.toLowerCase().includes(term));
+
+    return sortGames(filtered, sortMode);
+  }, [games, search, sortMode]);
+
+  const recentGames = useMemo(() => {
+    return [...games]
+      .filter((game) => game.lastPlayed)
+      .sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0))
+      .slice(0, 8);
+  }, [games]);
 
   const totalLibraryGames = filteredLibraryGames.length;
 
   const realIndex =
     totalLibraryGames > 0
-      ? ((selected % totalLibraryGames) + totalLibraryGames) % totalLibraryGames
+      ? ((selected % totalLibraryGames) + totalLibraryGames) %
+      totalLibraryGames
       : 0;
 
   const currentLibraryGame =
@@ -125,7 +262,11 @@ function App() {
 
   const infiniteLibraryGames =
     totalLibraryGames > 0
-      ? [...filteredLibraryGames, ...filteredLibraryGames, ...filteredLibraryGames]
+      ? [
+        ...filteredLibraryGames,
+        ...filteredLibraryGames,
+        ...filteredLibraryGames,
+      ]
       : [];
 
   const infiniteCenterOffset = totalLibraryGames;
@@ -143,8 +284,14 @@ function App() {
   }, [search]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(SORT_KEY, sortMode);
+    } catch { }
+  }, [sortMode]);
+
+  useEffect(() => {
     setSelected(0);
-  }, [search, screen]);
+  }, [search, screen, sortMode]);
 
   useEffect(() => {
     if (!totalLibraryGames) return;
@@ -174,7 +321,9 @@ function App() {
     if (!container || !totalLibraryGames) return;
 
     const targetIndex = realIndex + infiniteCenterOffset;
-    const selectedItem = container.children[targetIndex] as HTMLElement | undefined;
+    const selectedItem = container.children[targetIndex] as
+      | HTMLElement
+      | undefined;
 
     if (!selectedItem) return;
 
@@ -190,10 +339,20 @@ function App() {
     setBrowseMenuId(null);
   }, [screen]);
 
-  const handleAddScannedGame = (scannedGame: ScannedGame) => {
+  const handleAddScannedGame = async (scannedGame: ScannedGame) => {
+    const metadata = await resolveGameMetadata(scannedGame.name);
+
     setGames((prev) => {
+      const filePath =
+        scannedGame.launchType === "emulator"
+          ? scannedGame.gameFilePath
+          : scannedGame.executablePath;
+
       const alreadyExists = prev.some(
-        (game) => game.path === scannedGame.executablePath
+        (game) =>
+          game.path === filePath ||
+          game.executablePath === filePath ||
+          game.gameFilePath === filePath
       );
 
       if (alreadyExists) {
@@ -203,25 +362,48 @@ function App() {
 
       const newGame: Game = {
         id: scannedGame.id,
-        name: scannedGame.name,
-        cover: "default.jpg",
-        bg: "default-bg.jpg",
-        description: "Jogo importado pelo scanner.",
+        name: metadata.name || scannedGame.name,
+        cover: metadata.cover,
+        bg: metadata.bg,
+        description: metadata.description || "Jogo importado pelo scanner.",
         playtime: 0,
         installed: true,
         favorite: false,
-        path: scannedGame.executablePath,
-
-        launchType: "pc",
-        platform: "windows",
+        path:
+          scannedGame.launchType === "pc" ? scannedGame.executablePath : "",
+        executablePath:
+          scannedGame.launchType === "pc" ? scannedGame.executablePath : "",
+        gameFilePath:
+          scannedGame.launchType === "emulator"
+            ? scannedGame.gameFilePath
+            : "",
+        launchType: scannedGame.launchType,
+        platform: scannedGame.platform as Game["platform"],
+        emulatorId: scannedGame.emulatorId,
+        controllerProfileId:
+          scannedGame.platform === "windows"
+            ? "pc"
+            : (scannedGame.platform as Game["controllerProfileId"]),
       };
 
-      return [...prev, newGame];
+      const updatedGames = [...prev, newGame];
+
+      window.electronAPI.saveLibrary(updatedGames);
+
+      return updatedGames;
     });
   };
 
   const clearGames = () => {
-    setGames((prev) => prev.filter((game) => !game.path));
+    setGames((prev) => {
+      const updatedGames = prev.filter(
+        (game) => !game.path && !game.gameFilePath
+      );
+
+      window.electronAPI.saveLibrary(updatedGames);
+
+      return updatedGames;
+    });
   };
 
   const { handleLaunchGame } = useGameLauncher({
@@ -230,7 +412,81 @@ function App() {
     emulators,
     setScreen,
     setSelected,
+    setGames,
   });
+
+  if (showSplash) {
+    return (
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          background:
+            "radial-gradient(circle at center, #111827 0%, #050505 55%, #000 100%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          animation: "splashFadeIn 0.8s ease-out",
+        }}
+      >
+        <style>
+          {`
+                    @keyframes splashFadeIn {
+                        from {
+                            opacity: 0;
+                            transform: scale(0.98);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: scale(1);
+                        }
+                    }
+
+                    @keyframes splashPulse {
+                        0% {
+                            opacity: 0.65;
+                            transform: scale(1);
+                        }
+                        50% {
+                            opacity: 1;
+                            transform: scale(1.03);
+                        }
+                        100% {
+                            opacity: 0.65;
+                            transform: scale(1);
+                        }
+                    }
+                `}
+        </style>
+
+        <h1
+          style={{
+            fontSize: 72,
+            margin: 0,
+            letterSpacing: 8,
+            fontWeight: 800,
+            animation: "splashPulse 2s ease-in-out infinite",
+          }}
+        >
+          GAMELABS
+        </h1>
+
+        <p
+          style={{
+            opacity: 0.65,
+            marginTop: 16,
+            letterSpacing: 3,
+            fontSize: 13,
+            textTransform: "uppercase",
+          }}
+        >
+          Universal Gaming Platform
+        </p>
+      </div>
+    );
+  }
 
   if (screen === "favorites") {
     return (
@@ -261,6 +517,8 @@ function App() {
         search={search}
         setSearch={setSearch}
       >
+        <SortSelector sortMode={sortMode} setSortMode={setSortMode} />
+
         <BrowseView
           games={filteredBrowseGames}
           gameStatus={gameStatus}
@@ -277,6 +535,7 @@ function App() {
           onClearGames={clearGames}
           onRemoveGameFromSystem={handleRemoveGameFromSystem}
           onImportGameFile={importGameFile}
+          onUpdateGame={onUpdateGame}
         />
       </AppLayout>
     );
@@ -319,8 +578,11 @@ function App() {
       search={search}
       setSearch={setSearch}
     >
+      <SortSelector sortMode={sortMode} setSortMode={setSortMode} />
+
       <LibraryView
         currentLibraryGame={currentLibraryGame}
+        recentGames={recentGames}
         infiniteLibraryGames={infiniteLibraryGames}
         realIndex={realIndex}
         infiniteCenterOffset={infiniteCenterOffset}

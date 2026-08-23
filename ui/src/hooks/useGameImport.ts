@@ -1,5 +1,7 @@
+import React from "react";
 import { Game } from "../types/game";
-import { getGameMetadata } from "../services/metadata/gameMetadata";
+import { resolveGameMetadata } from "../services/metadata/metadataResolver";
+import { resolvePlatformFromFile } from "../shared/platforms";
 
 type Params = {
     setGames: React.Dispatch<React.SetStateAction<Game[]>>;
@@ -8,6 +10,7 @@ type Params = {
 const getFileNameWithoutExtension = (filePath: string) => {
     const normalized = filePath.replace(/\\/g, "/");
     const fileName = normalized.split("/").pop() || "Jogo importado";
+
     return fileName.replace(/\.[^/.]+$/, "");
 };
 
@@ -24,39 +27,63 @@ export function useGameImport({ setGames }: Params) {
         const filePath = result.path;
         const extension = getExtension(filePath);
         const name = getFileNameWithoutExtension(filePath);
-        const metadata = getGameMetadata(name);
 
-        const isPs2 = ["iso", "bin", "cue", "chd"].includes(extension);
+        const { platform, emulatorId, launchType } = resolvePlatformFromFile(filePath);
+
+        const isEmulated = launchType === "emulator";
+
+        const alreadyExists = await new Promise<boolean>((resolve) => {
+            setGames((prev) => {
+                resolve(
+                    prev.some(
+                        (game) =>
+                            game.path === filePath ||
+                            game.gameFilePath === filePath
+                    )
+                );
+
+                return prev;
+            });
+        });
+
+        if (alreadyExists) {
+            alert("Esse jogo já está na biblioteca.");
+            return;
+        }
+
+        const metadata = await resolveGameMetadata(name);
+
+        const now = Date.now();
 
         const newGame: Game = {
-            id: `${name.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`,
-            name: metadata.name,
+            id: `${name.toLowerCase().replace(/\s+/g, "-")}-${now}`,
+            name: metadata.name || name,
             cover: metadata.cover,
             bg: metadata.bg,
-            description: metadata.description,
+            description: metadata.description || "",
             playtime: 0,
             installed: true,
             favorite: false,
 
-            path: isPs2 ? "" : filePath,
-            gameFilePath: isPs2 ? filePath : "",
+            path: isEmulated ? "" : filePath,
+            executablePath: isEmulated ? "" : filePath,
+            gameFilePath: isEmulated ? filePath : "",
 
-            launchType: isPs2 ? "emulator" : "pc",
-            platform: isPs2 ? metadata.platform : "windows",
-            emulatorId: isPs2 ? "pcsx2" : undefined,
+            launchType: isEmulated ? "emulator" : "pc",
+            platform,
+            emulatorId,
+            controllerProfileId:
+                platform === "windows"
+                    ? "pc"
+                    : ((platform || "default") as Game["controllerProfileId"]),
         };
 
         setGames((prev) => {
-            const alreadyExists = prev.some(
-                (game) => game.path === filePath || game.gameFilePath === filePath
-            );
+            const updatedGames = [...prev, newGame];
 
-            if (alreadyExists) {
-                alert("Esse jogo já está na biblioteca.");
-                return prev;
-            }
+            window.electronAPI.saveLibrary(updatedGames);
 
-            return [...prev, newGame];
+            return updatedGames;
         });
     };
 

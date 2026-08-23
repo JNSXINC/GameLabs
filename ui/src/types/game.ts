@@ -1,15 +1,6 @@
-export type LaunchType = "pc" | "emulator";
+import type { Platform, ControllerProfileId } from "./platform";
 
-export type Platform =
-  | "windows"
-  | "ps1"
-  | "ps2"
-  | "psp"
-  | "gamecube"
-  | "wii"
-  | "snes"
-  | "gba"
-  | "arcade";
+export type LaunchType = "pc" | "emulator";
 
 export type Game = {
   id: string;
@@ -20,25 +11,19 @@ export type Game = {
   description: string;
 
   playtime: number;
+  lastPlayed?: number;
   installed: boolean;
   favorite?: boolean;
 
-  /**
-   * Caminho antigo/atual usado para jogos de PC.
-   * Vamos manter para não quebrar o launcher agora.
-   */
   path?: string;
+  executablePath?: string;
 
-  /**
-   * Novo modelo preparado para PC + emuladores.
-   */
   launchType?: LaunchType;
   platform?: Platform;
 
-  /**
-   * Futuro: usado quando o jogo abrir por emulador.
-   */
   emulatorId?: string;
   gameFilePath?: string;
   launchArgs?: string[];
+
+  controllerProfileId?: ControllerProfileId;
 };

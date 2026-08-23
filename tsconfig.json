@@ -13,5 +13,5 @@
   },
   "include": [
     "ui/src"
-  ]
+, "core/services/emulators"  ]
 }

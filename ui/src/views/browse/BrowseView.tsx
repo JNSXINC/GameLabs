@@ -25,6 +25,10 @@ type Props = {
   onClearGames: () => void;
   onRemoveGameFromSystem: (gameId: string) => void;
   onImportGameFile: () => void | Promise<void>;
+  onUpdateGame: (
+  gameId: string,
+  patch: Partial<Game>
+) => void | Promise<void>;
 };
 
 export default function BrowseView({
@@ -43,6 +47,7 @@ export default function BrowseView({
   onClearGames,
   onRemoveGameFromSystem,
   onImportGameFile,
+  onUpdateGame,
 }: Props) {
   const [scannedGames, setScannedGames] = useState<ScannedGame[]>([]);
   const [showScannedPanel, setShowScannedPanel] = useState(true);
@@ -138,6 +143,10 @@ export default function BrowseView({
       <div style={{ marginTop: "16px", marginBottom: "20px", maxWidth: "280px" }}>
         <ActionButton onClick={handleScanFolder}>
           Escanear pasta de jogos
+        </ActionButton>
+
+        <ActionButton onClick={onImportGameFile}>
+          Importar jogo
         </ActionButton>
       </div>
 
@@ -297,7 +306,11 @@ export default function BrowseView({
                     zIndex: 3,
                   }}
                 >
-                  <ExecutableName path={game.path} />
+                  <ExecutableName
+                    path={game.path}
+                    launchType={game.launchType}
+                    gameFilePath={game.gameFilePath}
+                  />
 
                   <GameActions
                     game={game}
@@ -307,6 +320,7 @@ export default function BrowseView({
                     onSetExecutable={setGameExecutable}
                     onRemoveExecutable={removeGameExecutable}
                     onOpenFolder={handleOpenGameFolder}
+                    onUpdateGame={onUpdateGame}
                     showExecutableActions
                     showOpenFolder
                     favoriteLabel={{

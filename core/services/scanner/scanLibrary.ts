@@ -1,6 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
-import { detectPlatform } from "./detectplatform";
+import {
+    detectPlatform,
+    getDefaultEmulatorId,
+    VALID_GAME_EXTENSIONS,
+    EmulatorId,
+} from "../platform/platformRegistry";
 import { hashGame } from "./hashGame";
 import { normalizeGameName } from "./normalizeGameName";
 
@@ -8,8 +13,11 @@ export type ScannedGame = {
     id: string;
     name: string;
     executablePath: string;
+    gameFilePath: string;
     folderPath: string;
     platform: string;
+    launchType: "pc" | "emulator";
+    emulatorId?: EmulatorId;
 };
 
 function shouldIgnoreFile(fileName: string): boolean {
@@ -53,18 +61,27 @@ function scanDirectoryRecursive(dirPath: string, results: ScannedGame[]) {
             }
 
             if (!entry.isFile()) continue;
-            if (!entry.name.toLowerCase().endsWith(".exe")) continue;
-            if (shouldIgnoreFile(entry.name)) continue;
+
+            const ext = path.extname(entry.name).toLowerCase();
+
+            if (!VALID_GAME_EXTENSIONS.includes(ext)) continue;
+
+            if (ext === ".exe" && shouldIgnoreFile(entry.name)) continue;
 
             const name = normalizeGameName(entry.name);
             const platform = detectPlatform(fullPath);
+            const launchType = platform === "windows" ? "pc" : "emulator";
+            const emulatorId = getDefaultEmulatorId(platform);
 
             results.push({
                 id: hashGame(fullPath),
                 name,
-                executablePath: fullPath,
+                executablePath: launchType === "pc" ? fullPath : "",
+                gameFilePath: launchType === "emulator" ? fullPath : "",
                 folderPath: path.dirname(fullPath),
                 platform,
+                launchType,
+                emulatorId,
             });
         } catch (error) {
             console.warn("Erro ao processar item do scanner:", entry.name, error);

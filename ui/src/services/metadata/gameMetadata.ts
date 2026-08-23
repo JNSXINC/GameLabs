@@ -9,7 +9,13 @@ export type GameMetadata = {
 };
 
 const normalize = (value: string) =>
-    value.toLowerCase().replace(/[^a-z0-9]/g, "");
+    value
+        .toLowerCase()
+        .replace(/\(.*?\)/g, "")
+        .replace(/\[.*?\]/g, "")
+        .replace(/_/g, "")
+        .replace(/[^a-z0-9]/g, "")
+        .trim();
 
 export function getGameMetadata(fileName: string): GameMetadata {
     const key = normalize(fileName);
@@ -54,6 +60,16 @@ export function getGameMetadata(fileName: string): GameMetadata {
             cover: "covers/gta-sa.jpg",
             bg: "backgrounds/gta-sa.jpg",
             description: "Domine as ruas e construa seu império no mundo aberto.",
+            platform: "ps2",
+        };
+    }
+
+    if (key.includes("bully")) {
+        return {
+            name: "Bully",
+            cover: "covers/bully.jpg",
+            bg: "backgrounds/bully.jpg",
+            description: "Viva a rotina caótica da Bullworth Academy.",
             platform: "ps2",
         };
     }
