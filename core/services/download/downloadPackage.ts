@@ -1,0 +1,155 @@
+import fs from "fs";
+import path from "path";
+import AdmZip from "adm-zip";
+import { extractFull } from "node-7z";
+import sevenZipBin from "7zip-bin";
+
+import { DownloadablePackage } from "./downloadablePackage";
+import { downloadFile } from "./downloadFile";
+import { resolveStaticUrl } from "./resolvers/staticUrlResolver";
+import { resolveGithubLatestReleaseUrl } from "./resolvers/githubReleaseResolver";
+
+export type DownloadStatus = "downloading" | "extracting" | "installed";
+export function findExecutable(
+  folder: string,
+  candidates: string[],
+): string | null {
+  const entries = fs.readdirSync(folder, {
+    withFileTypes: true,
+  });
+
+  for (const entry of entries) {
+    const fullPath = path.join(folder, entry.name);
+
+    if (entry.isDirectory()) {
+      const found = findExecutable(fullPath, candidates);
+
+      if (found) {
+        return found;
+      }
+    }
+
+    if (
+      entry.isFile() &&
+      candidates.some(
+        (candidate) => entry.name.toLowerCase() === candidate.toLowerCase(),
+      )
+    ) {
+      return fullPath;
+    }
+  }
+
+  return null;
+}
+
+export async function resolveDownloadUrl(
+  packageConfig: DownloadablePackage,
+): Promise<string> {
+  if (packageConfig.resolver.type === "static") {
+    return resolveStaticUrl(packageConfig.resolver.url || "");
+  }
+
+  if (packageConfig.resolver.type === "manual") {
+    throw new Error(
+      `Download automático não disponível para ${packageConfig.name}.`,
+    );
+  }
+
+  if (packageConfig.resolver.type === "github_latest") {
+    if (
+      !packageConfig.resolver.owner ||
+      !packageConfig.resolver.repo ||
+      !packageConfig.resolver.assetIncludes
+    ) {
+      throw new Error("Resolver GitHub incompleto.");
+    }
+
+    return resolveGithubLatestReleaseUrl({
+      owner: packageConfig.resolver.owner,
+      repo: packageConfig.resolver.repo,
+      assetIncludes: packageConfig.resolver.assetIncludes,
+      assetExcludes: packageConfig.resolver.assetExcludes,
+    });
+  }
+
+  throw new Error("Tipo de resolver não suportado.");
+}
+
+export async function downloadPackage(
+  packageConfig: DownloadablePackage,
+  onProgress?: (progress: number) => void,
+  onStatus?: (status: DownloadStatus) => void,
+) {
+  const downloadUrl = await resolveDownloadUrl(packageConfig);
+
+  console.log(`[Download] URL: ${downloadUrl}`);
+
+  const installDir = path.join(process.cwd(), packageConfig.installFolder);
+
+  const tempDir = path.join(process.cwd(), "data", "temp", "downloads");
+
+  fs.mkdirSync(tempDir, { recursive: true });
+
+  const archivePath = path.join(
+    tempDir,
+    `${packageConfig.id}.${packageConfig.archiveType}`,
+  );
+
+  console.log(`[Download] [1/3] Baixando ${packageConfig.name}...`);
+
+  onStatus?.("downloading");
+
+  await downloadFile(downloadUrl, archivePath, (progress) => {
+    console.log(`[Download] ${packageConfig.name}: ${progress}%`);
+    onProgress?.(progress);
+  });
+
+  console.log(`[Download] [2/3] Extraindo ${packageConfig.name}...`);
+
+  onStatus?.("extracting");
+
+  fs.mkdirSync(installDir, { recursive: true });
+
+  if (packageConfig.archiveType === "zip") {
+    const zip = new AdmZip(archivePath);
+    zip.extractAllTo(installDir, true);
+  } else if (packageConfig.archiveType === "7z") {
+    await new Promise<void>((resolve, reject) => {
+      const stream = extractFull(archivePath, installDir, {
+        $bin: sevenZipBin.path7za,
+      });
+
+      stream.on("end", () => resolve());
+      stream.on("error", (error) => reject(error));
+    });
+  } else {
+    throw new Error(
+      `Tipo de arquivo ainda não suportado: ${packageConfig.archiveType}`,
+    );
+  }
+
+  const executablePath = findExecutable(
+    installDir,
+    packageConfig.executableCandidates,
+  );
+
+  if (!executablePath) {
+    throw new Error(
+      `Executável não encontrado após extração de ${packageConfig.name}.`,
+    );
+  }
+
+  console.log(
+    `[Download] [3/3] ${packageConfig.name} instalado em ${executablePath}`,
+  );
+
+  onStatus?.("installed");
+
+  return {
+    success: true,
+    id: packageConfig.id,
+    name: packageConfig.name,
+    installDir,
+    executablePath,
+  };
+}
