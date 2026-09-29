@@ -20,6 +20,8 @@ import {
   killDS4,
 } from "../services/controls/ds4";
 
+import { ensureDS4Dependencies } from "../services/controls/ds4Dependencies";
+
 let mainWindow: BrowserWindow | null = null;
 
 function getControllerSettings() {
@@ -28,7 +30,7 @@ function getControllerSettings() {
       process.cwd(),
       "data",
       "preferences",
-      "controllers.json"
+      "controllers.json",
     );
 
     if (!fs.existsSync(controllersPath)) {
@@ -41,10 +43,23 @@ function getControllerSettings() {
   }
 }
 
-function setupDS4Integration() {
+async function setupDS4Integration() {
   const settings = getControllerSettings();
 
   if (!settings || !settings.ds4Path) {
+    return;
+  }
+
+  if (!settings.autoStartDS4 && !settings.watchdogDS4) {
+    return;
+  }
+
+  const dependencies = await ensureDS4Dependencies();
+
+  if (!dependencies.dotnetInstalled || !dependencies.vigemBusInstalled) {
+    console.error(
+      "DS4Windows não iniciado: dependências obrigatórias ausentes.",
+    );
     return;
   }
 
@@ -93,7 +108,7 @@ function getGpuName(): Promise<string> {
           lines[0];
 
         resolve(dedicatedGpu || "GPU não detectada");
-      }
+      },
     );
   });
 }
@@ -156,7 +171,13 @@ function createWindow() {
   if (devUrl) {
     mainWindow.loadURL(devUrl);
   } else {
-    mainWindow.loadFile(path.join(__dirname, "../dist/ui/index.html"));
+    const uiPath = app.isPackaged
+      ? path.join(process.resourcesPath, "app.asar", "dist", "ui", "index.html")
+      : path.join(process.cwd(), "dist", "ui", "index.html");
+
+    console.log("UI PATH:", uiPath);
+
+    mainWindow.loadFile(uiPath);
   }
 
   mainWindow.on("closed", () => {
@@ -164,8 +185,8 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  setupDS4Integration();
+app.whenReady().then(async () => {
+  await setupDS4Integration();
 
   ipcMain.handle("system:get-info", async () => {
     const cpu = os.cpus()[0]?.model || "CPU não detectada";
@@ -210,10 +231,7 @@ app.whenReady().then(() => {
 
       return {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro desconhecido.",
+        error: error instanceof Error ? error.message : "Erro desconhecido.",
       };
     }
   });
@@ -234,10 +252,7 @@ app.whenReady().then(() => {
     } catch (error) {
       return {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro desconhecido.",
+        error: error instanceof Error ? error.message : "Erro desconhecido.",
       };
     }
   });

@@ -32,10 +32,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   searchSteamGridGame: async (gameName: string) => {
-    return ipcRenderer.invoke(
-      "metadata:search-steamgriddb",
-      gameName
-    );
+    return ipcRenderer.invoke("metadata:search-steamgriddb", gameName);
   },
 
   loadLibrary: async () => {
@@ -75,10 +72,50 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   downloadEmulator: async (emulatorId: string) => {
-    return ipcRenderer.invoke(
-      "downloads:emulator",
-      emulatorId
-    );
+    return ipcRenderer.invoke("downloads:emulator", emulatorId);
+  },
+
+  onDownloadProgress: (
+    callback: (data: { emulatorId: string; progress: number }) => void,
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: {
+        emulatorId: string;
+        progress: number;
+      },
+    ) => {
+      callback(data);
+    };
+
+    ipcRenderer.on("downloads:progress", listener);
+
+    return () => {
+      ipcRenderer.removeListener("downloads:progress", listener);
+    };
+  },
+
+  onDownloadStatus: (
+    callback: (data: {
+      emulatorId: string;
+      status: "downloading" | "extracting" | "installed";
+    }) => void,
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: {
+        emulatorId: string;
+        status: "downloading" | "extracting" | "installed";
+      },
+    ) => {
+      callback(data);
+    };
+
+    ipcRenderer.on("downloads:status", listener);
+
+    return () => {
+      ipcRenderer.removeListener("downloads:status", listener);
+    };
   },
 
   loadSettings: async () => {
@@ -99,6 +136,30 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   selectDS4Executable: async () => {
     return ipcRenderer.invoke("controllers:select-ds4");
+  },
+
+  checkDS4Dependencies: async () => {
+    return ipcRenderer.invoke("controllers:check-ds4-dependencies");
+  },
+
+  ensureDS4Dependencies: async () => {
+    return ipcRenderer.invoke("controllers:ensure-ds4-dependencies");
+  },
+
+  setupDS4Windows: async () => {
+    return ipcRenderer.invoke("controllers:setup-ds4");
+  },
+
+  onDS4DownloadProgress: (callback: (progress: number) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: number) => {
+      callback(progress);
+    };
+
+    ipcRenderer.on("controllers:ds4-download-progress", listener);
+
+    return () => {
+      ipcRenderer.removeListener("controllers:ds4-download-progress", listener);
+    };
   },
 
   onGameClosed: (callback: () => void) => {

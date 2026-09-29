@@ -1,1 +1,0 @@
-deviceDetector.ts

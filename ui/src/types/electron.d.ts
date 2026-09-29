@@ -1,11 +1,10 @@
 import type { ScannedGame } from "./scanner";
 
-export { };
+export {};
 
 declare global {
   interface Window {
     electronAPI: {
-
       loadLibrary: () => Promise<Game[]>;
 
       saveLibrary: (games: Game[]) => Promise<{ success: boolean }>;
@@ -14,12 +13,10 @@ declare global {
 
       updateGameInLibrary: (
         gameId: string,
-        patch: Partial<Game>
+        patch: Partial<Game>,
       ) => Promise<{ success: boolean }>;
 
-      removeGameFromLibrary: (
-        gameId: string
-      ) => Promise<{ success: boolean }>;
+      removeGameFromLibrary: (gameId: string) => Promise<{ success: boolean }>;
 
       launchGame: (game: unknown) => Promise<{
         success: boolean;
@@ -69,18 +66,11 @@ declare global {
         }[]
       >;
 
-      selectBios: (
-        platform: string,
-        region?: string
-      ) => Promise<string | null>;
+      selectBios: (platform: string, region?: string) => Promise<string | null>;
 
-      openBiosFolder: (
-        biosPath?: string
-      ) => Promise<void>;
+      openBiosFolder: (biosPath?: string) => Promise<void>;
 
-      downloadEmulator: (
-        emulatorId: string
-      ) => Promise<{
+      downloadEmulator: (emulatorId: string) => Promise<{
         success: boolean;
         emulatorId: string;
         name?: string;
@@ -88,7 +78,61 @@ declare global {
         executablePath?: string;
       }>;
 
+      onDownloadProgress: (
+        callback: (data: { emulatorId: string; progress: number }) => void,
+      ) => () => void;
+
+      onDownloadStatus: (
+        callback: (data: {
+          emulatorId: string;
+          status: "downloading" | "extracting" | "installed";
+        }) => void,
+      ) => () => void;
+
       searchSteamGridGame: (gameName: string) => Promise<any>;
+
+      loadControllerSettings: () => Promise<{
+        autoStartDS4: boolean;
+        watchdogDS4: boolean;
+        closeWithGameLabs: boolean;
+        ds4Path: string;
+      }>;
+
+      saveControllerSettings: (settings: {
+        autoStartDS4: boolean;
+        watchdogDS4: boolean;
+        closeWithGameLabs: boolean;
+        ds4Path: string;
+      }) => Promise<boolean>;
+
+      selectDS4Executable: () => Promise<{
+        canceled: boolean;
+        path: string | null;
+      }>;
+
+      checkDS4Dependencies: () => Promise<{
+        dotnetInstalled: boolean;
+        vigemBusInstalled: boolean;
+      }>;
+
+      ensureDS4Dependencies: () => Promise<{
+        dotnetInstalled: boolean;
+        vigemBusInstalled: boolean;
+      }>;
+
+      setupDS4Windows: () => Promise<{
+        success: boolean;
+        executablePath: string;
+        installDir: string;
+        dependencies: {
+          dotnetInstalled: boolean;
+          vigemBusInstalled: boolean;
+        };
+      }>;
+
+      onDS4DownloadProgress: (
+        callback: (progress: number) => void,
+      ) => () => void;
 
       onGameClosed: (callback: () => void) => () => void;
     };
