@@ -9,6 +9,11 @@ import { downloadFile } from "./downloadFile";
 import { resolveStaticUrl } from "./resolvers/staticUrlResolver";
 import { resolveGithubLatestReleaseUrl } from "./resolvers/githubReleaseResolver";
 
+import {
+  getEmulatorsInstallPath,
+  getDownloadsTempPath,
+} from "../storage/appPaths";
+
 export type DownloadStatus = "downloading" | "extracting" | "installed";
 export function findExecutable(
   folder: string,
@@ -84,9 +89,22 @@ export async function downloadPackage(
 
   console.log(`[Download] URL: ${downloadUrl}`);
 
-  const installDir = path.join(process.cwd(), packageConfig.installFolder);
+  const installFolder = packageConfig.installFolder.replace(/\\/g, "/");
 
-  const tempDir = path.join(process.cwd(), "data", "temp", "downloads");
+  if (
+    path.posix.isAbsolute(installFolder) ||
+    path.win32.isAbsolute(installFolder) ||
+    installFolder.split("/").includes("..") ||
+    !installFolder.startsWith("Emulators/")
+  ) {
+    throw new Error("Diretório de instalação inválido.");
+  }
+
+  const emulatorFolder = installFolder.slice("Emulators/".length);
+
+  const installDir = path.join(getEmulatorsInstallPath(), emulatorFolder);
+
+  const tempDir = getDownloadsTempPath();
 
   fs.mkdirSync(tempDir, { recursive: true });
 

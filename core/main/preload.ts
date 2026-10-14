@@ -75,6 +75,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return ipcRenderer.invoke("downloads:emulator", emulatorId);
   },
 
+  migrateEmulators: async (sourcePath: string) => {
+    return ipcRenderer.invoke("emulators:migrate", sourcePath);
+  },
+
   onDownloadProgress: (
     callback: (data: { emulatorId: string; progress: number }) => void,
   ) => {

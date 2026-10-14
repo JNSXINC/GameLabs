@@ -1,73 +1,71 @@
 import { ipcMain, dialog, shell } from "electron";
+import fs from "node:fs";
 import path from "path";
+import { getGameLabsDataPath } from "../services/storage/appPaths";
 import {
-    loadBiosConfigs,
-    updateBiosPath,
+  loadBiosConfigs,
+  updateBiosPath,
 } from "../services/emulators/bios/biosManager";
 import {
-    getBiosRegionStatus,
-    getBiosStatus,
+  getBiosRegionStatus,
+  getBiosStatus,
 } from "../services/emulators/bios/getBiosStatus";
-import {
-    BiosPlatform,
-    BiosRegion,
-} from "../services/emulators/bios/biosTypes";
+import { BiosPlatform, BiosRegion } from "../services/emulators/bios/biosTypes";
 
 export function registerBiosIpc() {
-    ipcMain.handle("bios:list", async () => {
-        const configs = loadBiosConfigs();
+  ipcMain.handle("bios:list", async () => {
+    const configs = loadBiosConfigs();
 
-        return configs.map((bios) => ({
-            ...bios,
-            status: getBiosStatus(bios),
-            regions: bios.regions?.map((region) => ({
-                ...region,
-                status: getBiosRegionStatus(region),
-            })),
-        }));
-    });
+    return configs.map((bios) => ({
+      ...bios,
+      status: getBiosStatus(bios),
+      regions: bios.regions?.map((region) => ({
+        ...region,
+        status: getBiosRegionStatus(region),
+      })),
+    }));
+  });
 
-    ipcMain.handle(
-        "bios:select",
-        async (
-            _,
-            platform: BiosPlatform,
-            region?: BiosRegion
-        ) => {
-            const result = await dialog.showOpenDialog({
-                title: "Selecionar BIOS",
-                properties: ["openFile"],
-                filters: [
-                    {
-                        name: "BIOS",
-                        extensions: ["bin", "rom", "iso", "cue"],
-                    },
-                    {
-                        name: "Todos os arquivos",
-                        extensions: ["*"],
-                    },
-                ],
-            });
+  ipcMain.handle(
+    "bios:select",
+    async (_, platform: BiosPlatform, region?: BiosRegion) => {
+      const result = await dialog.showOpenDialog({
+        title: "Selecionar BIOS",
+        properties: ["openFile"],
+        filters: [
+          {
+            name: "BIOS",
+            extensions: ["bin", "rom", "iso", "cue"],
+          },
+          {
+            name: "Todos os arquivos",
+            extensions: ["*"],
+          },
+        ],
+      });
 
-            if (result.canceled || result.filePaths.length === 0) {
-                return null;
-            }
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
 
-            const biosPath = result.filePaths[0];
+      const biosPath = result.filePaths[0];
 
-            updateBiosPath(platform, biosPath, region);
+      updateBiosPath(platform, biosPath, region);
 
-            return biosPath;
-        }
-    );
+      return biosPath;
+    },
+  );
 
-    ipcMain.handle("bios:open-folder", async (_, biosPath?: string) => {
-        if (!biosPath) {
-            const folder = path.join(process.cwd(), "data", "bios");
-            await shell.openPath(folder);
-            return;
-        }
+  ipcMain.handle("bios:open-folder", async (_, biosPath?: string) => {
+    if (!biosPath) {
+      const folder = path.join(getGameLabsDataPath(), "bios");
 
-        await shell.openPath(path.dirname(biosPath));
-    });
+      await fs.promises.mkdir(folder, { recursive: true });
+
+      await shell.openPath(folder);
+      return;
+    }
+
+    await shell.openPath(path.dirname(biosPath));
+  });
 }

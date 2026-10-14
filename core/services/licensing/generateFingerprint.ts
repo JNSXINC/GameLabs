@@ -1,1 +1,0 @@
-generateFingerprint.ts

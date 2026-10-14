@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import { execFile } from "node:child_process";
 
+import { readControllerSettings } from "../services/controls/controllerSettings";
 import { registerGameScannerIpc } from "../ipc/gameScanner";
 import { registerMetadataIpc } from "../ipc/metadata";
 import { registerLibraryIpc } from "../ipc/library";
@@ -12,6 +13,14 @@ import { registerSettingsIpc } from "../ipc/settings";
 import { launchGame } from "../services/launcher/launchGame";
 import { registerDownloadsIpc } from "../ipc/downloads";
 import { registerBiosIpc } from "../ipc/bios";
+import type { EmulatorMigrationResult } from "../services/storage/emulatorMigration";
+import { Worker } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
+
+import {
+  ensureGameLabsDirectories,
+  migrateLegacyGameLabsData,
+} from "../services/storage/appPaths";
 
 import {
   launchDS4,
@@ -25,22 +34,7 @@ import { ensureDS4Dependencies } from "../services/controls/ds4Dependencies";
 let mainWindow: BrowserWindow | null = null;
 
 function getControllerSettings() {
-  try {
-    const controllersPath = path.join(
-      process.cwd(),
-      "data",
-      "preferences",
-      "controllers.json",
-    );
-
-    if (!fs.existsSync(controllersPath)) {
-      return null;
-    }
-
-    return JSON.parse(fs.readFileSync(controllersPath, "utf8"));
-  } catch {
-    return null;
-  }
+  return readControllerSettings();
 }
 
 async function setupDS4Integration() {
@@ -186,6 +180,14 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  app.setName("GameLabs");
+
+  app.setPath("userData", path.join(app.getPath("appData"), "GameLabs"));
+
+  ensureGameLabsDirectories();
+
+  migrateLegacyGameLabsData();
+
   await setupDS4Integration();
 
   ipcMain.handle("system:get-info", async () => {
@@ -351,6 +353,120 @@ app.whenReady().then(async () => {
       canceled: false,
       path: result.filePaths[0],
     };
+  });
+
+  ipcMain.handle("emulators:migrate", async (_, sourcePath: string) => {
+    try {
+      if (typeof sourcePath !== "string" || !sourcePath.trim()) {
+        throw new Error("Diretório de origem inválido.");
+      }
+
+      const source = path.resolve(sourcePath);
+      if (!fs.existsSync(source)) {
+        throw new Error("A pasta de origem não existe.");
+      }
+
+      const sourceInfo = fs.lstatSync(source);
+
+      if (!sourceInfo.isDirectory() || sourceInfo.isSymbolicLink()) {
+        throw new Error("A origem precisa ser uma pasta válida.");
+      }
+
+      const allowedLegacyPath = path.resolve(process.cwd(), "Emulators");
+
+      if (source.toLowerCase() !== allowedLegacyPath.toLowerCase()) {
+        throw new Error(
+          "A migração automática aceita apenas a pasta antiga do GameLabs.",
+        );
+      }
+
+      const destination = path.resolve(
+        path.join(
+          app.getPath("appData"),
+          "..",
+          "Local",
+          "GameLabs",
+          "Emulators",
+        ),
+      );
+
+      if (
+        path.basename(source).toLowerCase() !== "emulators" ||
+        source.toLowerCase() === destination.toLowerCase()
+      ) {
+        throw new Error("Origem de migração não permitida.");
+      }
+
+      const confirmation = await dialog.showMessageBox({
+        type: "question",
+        buttons: ["Cancelar", "Migrar emuladores"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+        title: "GameLabs — Migração de Emuladores",
+        message: "Deseja migrar seus emuladores para o GameLabs?",
+        detail:
+          `Origem:\n${source}\n\n` +
+          `Destino:\n${destination}\n\n` +
+          "Os arquivos serão copiados, sem excluir os originais.\n" +
+          "Arquivos existentes no destino não serão sobrescritos.",
+      });
+
+      if (confirmation.response !== 1) {
+        return {
+          success: false,
+          cancelled: true,
+          sourcePath: source,
+          destinationPath: destination,
+          copiedFiles: 0,
+          skippedFiles: 0,
+          errors: [],
+        };
+      }
+
+      return await new Promise<EmulatorMigrationResult>((resolve, reject) => {
+        const workerPath = path.join(
+          __dirname,
+          "../services/storage/emulatorMigrationWorker.js",
+        );
+
+        const worker = new Worker(workerPath);
+        let settled = false;
+
+        worker.once("message", (result: EmulatorMigrationResult) => {
+          settled = true;
+          resolve(result);
+        });
+
+        worker.once("error", (error) => {
+          settled = true;
+          reject(error);
+        });
+
+        worker.once("exit", (code) => {
+          if (!settled) {
+            reject(
+              new Error(`Worker de migração encerrado com código ${code}.`),
+            );
+          }
+        });
+
+        worker.postMessage({
+          sourcePath: source,
+          destinationPath: destination,
+        });
+      });
+    } catch (error) {
+      console.error("[GameLabs] Erro na migração:", error);
+
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Erro desconhecido na migração.",
+      };
+    }
   });
 
   registerGameScannerIpc();

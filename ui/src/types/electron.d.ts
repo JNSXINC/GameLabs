@@ -78,6 +78,17 @@ declare global {
         executablePath?: string;
       }>;
 
+      migrateEmulators: (sourcePath: string) => Promise<{
+        success: boolean;
+        sourcePath?: string;
+        destinationPath?: string;
+        copiedFiles?: number;
+        skippedFiles?: number;
+        errors?: string[];
+        verifiedFiles?: string[];
+        error?: string;
+      }>;
+
       onDownloadProgress: (
         callback: (data: { emulatorId: string; progress: number }) => void,
       ) => () => void;

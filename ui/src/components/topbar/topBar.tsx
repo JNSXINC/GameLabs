@@ -17,7 +17,10 @@ export default function TopBar({
   setSearch,
   assetUrl,
 }: Props) {
-  const logoSrc = assetUrl ? assetUrl("logo.png") : "/logo.png";
+  const logoSrc = new URL(
+    `${import.meta.env.BASE_URL}logo.png`,
+    document.baseURI,
+  ).href;
 
   const menuItemStyle = (active: boolean): React.CSSProperties => ({
     background: "transparent",
