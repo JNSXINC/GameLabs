@@ -10,3 +10,4 @@ data/temp/
 controlls_config/
 # Ferramentas instaladas localmente pelo GameLabs
 /Controls/
+/admin-tools/private-keys/

@@ -8,6 +8,7 @@ import FavoritesView from "./views/favorites/FavoritesView";
 import LibraryView from "./views/library/LibraryView";
 import SettingsView from "./views/settings/SettingsView";
 import UserView from "./views/user/UserView";
+import ActivationView from "./views/settings/licensing/ActivationView";
 
 import { useFavorites } from "./hooks/useFavorites";
 import { useGameValidation } from "./hooks/useGameValidation";
@@ -48,9 +49,7 @@ function sortGames(games: Game[], sortMode: SortMode) {
       break;
 
     case "platform":
-      result.sort((a, b) =>
-        (a.platform || "").localeCompare(b.platform || "")
-      );
+      result.sort((a, b) => (a.platform || "").localeCompare(b.platform || ""));
       break;
 
     case "favorites":
@@ -106,14 +105,56 @@ function SortSelector({
 }
 
 function App() {
-
   const [showSplash, setShowSplash] = useState(true);
+
+  const [previewActivation, setPreviewActivation] = useState(true);
+
+  const [activationError, setActivationError] = useState<string | null>(null);
+  const [activating, setActivating] = useState(false);
+
+  const handleActivateLicense = async (licenseText: string) => {
+    if (activating) return;
+
+    setActivating(true);
+    setActivationError(null);
+
+    try {
+      const license = JSON.parse(licenseText);
+
+      const result = await window.electronAPI.activateLicense(license);
+
+      if (result.valid) {
+        setPreviewActivation(false);
+        return;
+      }
+
+      const messages: Record<string, string> = {
+        INVALID_FORMAT: "Formato de licença inválido.",
+        INVALID_SIGNATURE: "A assinatura da licença é inválida.",
+        DEVICE_MISMATCH: "Esta licença pertence a outro computador.",
+        EXPIRED: "Esta licença expirou.",
+        CLOCK_VERIFICATION_REQUIRED:
+          "Esta licença precisa de verificação online.",
+        ACTIVATION_FAILED: "Não foi possível ativar a licença.",
+      };
+
+      setActivationError(
+        messages[result.reason] ?? "Não foi possível validar a licença.",
+      );
+    } catch {
+      setActivationError(
+        "Não foi possível processar a licença. Verifique o formato JSON.",
+      );
+    } finally {
+      setActivating(false);
+    }
+  };
 
   const { games, setGames, favorites, toggleFavorite } = useFavorites(
     (baseGames as Game[]).map((game) => ({
       ...game,
       path: game.path || "",
-    }))
+    })),
   );
 
   useEffect(() => {
@@ -213,7 +254,7 @@ function App() {
   const onUpdateGame = async (gameId: string, patch: Partial<Game>) => {
     setGames((prevGames) => {
       const updatedGames = prevGames.map((game) =>
-        game.id === gameId ? { ...game, ...patch } : game
+        game.id === gameId ? { ...game, ...patch } : game,
       );
 
       window.electronAPI.saveLibrary(updatedGames);
@@ -253,8 +294,7 @@ function App() {
 
   const realIndex =
     totalLibraryGames > 0
-      ? ((selected % totalLibraryGames) + totalLibraryGames) %
-      totalLibraryGames
+      ? ((selected % totalLibraryGames) + totalLibraryGames) % totalLibraryGames
       : 0;
 
   const currentLibraryGame =
@@ -263,10 +303,10 @@ function App() {
   const infiniteLibraryGames =
     totalLibraryGames > 0
       ? [
-        ...filteredLibraryGames,
-        ...filteredLibraryGames,
-        ...filteredLibraryGames,
-      ]
+          ...filteredLibraryGames,
+          ...filteredLibraryGames,
+          ...filteredLibraryGames,
+        ]
       : [];
 
   const infiniteCenterOffset = totalLibraryGames;
@@ -274,19 +314,19 @@ function App() {
   useEffect(() => {
     try {
       localStorage.setItem(SCREEN_KEY, screen);
-    } catch { }
+    } catch {}
   }, [screen]);
 
   useEffect(() => {
     try {
       localStorage.setItem(SEARCH_KEY, search);
-    } catch { }
+    } catch {}
   }, [search]);
 
   useEffect(() => {
     try {
       localStorage.setItem(SORT_KEY, sortMode);
-    } catch { }
+    } catch {}
   }, [sortMode]);
 
   useEffect(() => {
@@ -352,7 +392,7 @@ function App() {
         (game) =>
           game.path === filePath ||
           game.executablePath === filePath ||
-          game.gameFilePath === filePath
+          game.gameFilePath === filePath,
       );
 
       if (alreadyExists) {
@@ -369,14 +409,11 @@ function App() {
         playtime: 0,
         installed: true,
         favorite: false,
-        path:
-          scannedGame.launchType === "pc" ? scannedGame.executablePath : "",
+        path: scannedGame.launchType === "pc" ? scannedGame.executablePath : "",
         executablePath:
           scannedGame.launchType === "pc" ? scannedGame.executablePath : "",
         gameFilePath:
-          scannedGame.launchType === "emulator"
-            ? scannedGame.gameFilePath
-            : "",
+          scannedGame.launchType === "emulator" ? scannedGame.gameFilePath : "",
         launchType: scannedGame.launchType,
         platform: scannedGame.platform as Game["platform"],
         emulatorId: scannedGame.emulatorId,
@@ -397,7 +434,7 @@ function App() {
   const clearGames = () => {
     setGames((prev) => {
       const updatedGames = prev.filter(
-        (game) => !game.path && !game.gameFilePath
+        (game) => !game.path && !game.gameFilePath,
       );
 
       window.electronAPI.saveLibrary(updatedGames);
@@ -414,6 +451,16 @@ function App() {
     setSelected,
     setGames,
   });
+
+  if (previewActivation) {
+    return (
+      <ActivationView
+        onActivate={handleActivateLicense}
+        error={activationError}
+        activating={activating}
+      />
+    );
+  }
 
   if (showSplash) {
     return (

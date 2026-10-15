@@ -23,6 +23,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return ipcRenderer.invoke("system:get-info");
   },
 
+  getDeviceFingerprint: async (): Promise<string> => {
+    return ipcRenderer.invoke("licensing:get-device-fingerprint");
+  },
+
+  getLicenseStatus: () => ipcRenderer.invoke("licensing:get-status"),
+
+  activateLicense: (license: unknown) =>
+    ipcRenderer.invoke("licensing:activate", license),
+
   openGameFolder: async (gamePath: string) => {
     return ipcRenderer.invoke("open-game-folder", gamePath);
   },
@@ -128,6 +137,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   saveSettings: async (settings: unknown) => {
     return ipcRenderer.invoke("settings:save", settings);
+  },
+
+  loadUserProfile: async () => {
+    return ipcRenderer.invoke("user-profile:load");
+  },
+
+  saveUserProfile: async (changes: { displayName: string }) => {
+    return ipcRenderer.invoke("user-profile:save", changes);
+  },
+
+  selectUserAvatar: async () => {
+    return ipcRenderer.invoke("user-profile:select-avatar");
+  },
+
+  readUserAvatar: async (): Promise<string | null> => {
+    return ipcRenderer.invoke("user-profile:read-avatar");
   },
 
   loadControllerSettings: async () => {

@@ -4,6 +4,11 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import { execFile } from "node:child_process";
 
+import { readLocalLicense } from "../services/licensing/readLocalLicense";
+import { validateLicense } from "../services/licensing/validateLicense";
+import { LICENSE_PUBLIC_KEY_PEM } from "../services/licensing/licensePublicKey";
+import { activateLicense } from "../services/licensing/activateLicense";
+
 import { readControllerSettings } from "../services/controls/controllerSettings";
 import { registerGameScannerIpc } from "../ipc/gameScanner";
 import { registerMetadataIpc } from "../ipc/metadata";
@@ -16,6 +21,8 @@ import { registerBiosIpc } from "../ipc/bios";
 import type { EmulatorMigrationResult } from "../services/storage/emulatorMigration";
 import { Worker } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
+import { registerUserProfileIpc } from "../ipc/userProfile";
+import { generateFingerprint } from "../services/licensing/generateFingerprint";
 
 import {
   ensureGameLabsDirectories,
@@ -189,6 +196,49 @@ app.whenReady().then(async () => {
   migrateLegacyGameLabsData();
 
   await setupDS4Integration();
+
+  ipcMain.handle("licensing:get-device-fingerprint", async () => {
+    return generateFingerprint();
+  });
+
+  ipcMain.handle("licensing:get-status", async () => {
+    try {
+      const license = readLocalLicense();
+
+      if (!license) {
+        return {
+          valid: false,
+          reason: "NO_LICENSE",
+        };
+      }
+
+      return validateLicense(
+        license,
+        generateFingerprint(),
+        LICENSE_PUBLIC_KEY_PEM,
+      );
+    } catch (error) {
+      console.error("[GameLabs] Erro ao consultar licença:", error);
+
+      return {
+        valid: false,
+        reason: "LICENSE_CHECK_FAILED",
+      };
+    }
+  });
+
+  ipcMain.handle("licensing:activate", async (_event, input: unknown) => {
+    try {
+      return activateLicense(input);
+    } catch (error) {
+      console.error("[GameLabs] Erro ao ativar licença:", error);
+
+      return {
+        valid: false,
+        reason: "ACTIVATION_FAILED",
+      };
+    }
+  });
 
   ipcMain.handle("system:get-info", async () => {
     const cpu = os.cpus()[0]?.model || "CPU não detectada";
@@ -474,6 +524,7 @@ app.whenReady().then(async () => {
   registerLibraryIpc();
   registerControllersIpc();
   registerSettingsIpc();
+  registerUserProfileIpc();
   registerDownloadsIpc();
   registerBiosIpc();
 

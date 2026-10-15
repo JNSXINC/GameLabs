@@ -1,10 +1,41 @@
 import type { ScannedGame } from "./scanner";
 
+export type UserProfile = {
+  schemaVersion: 1;
+  displayName: string;
+  avatarFile: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export {};
 
 declare global {
   interface Window {
     electronAPI: {
+      loadUserProfile: () => Promise<UserProfile>;
+
+      saveUserProfile: (changes: {
+        displayName: string;
+      }) => Promise<UserProfile>;
+
+      loadSettings: () => Promise<{
+        performancePreset: "baixo" | "equilibrado" | "alto" | "ultra";
+        autoDetectHardware: boolean;
+      }>;
+
+      saveSettings: (settings: {
+        performancePreset: "baixo" | "equilibrado" | "alto" | "ultra";
+        autoDetectHardware: boolean;
+      }) => Promise<{
+        performancePreset: "baixo" | "equilibrado" | "alto" | "ultra";
+        autoDetectHardware: boolean;
+      }>;
+
+      selectUserAvatar: () => Promise<UserProfile | null>;
+
+      readUserAvatar: () => Promise<string | null>;
+
       loadLibrary: () => Promise<Game[]>;
 
       saveLibrary: (games: Game[]) => Promise<{ success: boolean }>;
@@ -36,6 +67,44 @@ declare global {
       checkGamePath: (path: string) => Promise<{
         exists: boolean;
       }>;
+
+      getDeviceFingerprint: () => Promise<string>;
+
+      getLicenseStatus: () => Promise<
+        | {
+            valid: true;
+            license: {
+              schemaVersion: 1;
+              licenseId: string;
+              type: "trial" | "lifetime";
+              deviceFingerprint: string;
+              issuedAt: string;
+              expiresAt: string | null;
+            };
+          }
+        | {
+            valid: false;
+            reason: string;
+          }
+      >;
+
+      activateLicense: (license: unknown) => Promise<
+        | {
+            valid: true;
+            license: {
+              schemaVersion: 1;
+              licenseId: string;
+              type: "trial" | "lifetime";
+              deviceFingerprint: string;
+              issuedAt: string;
+              expiresAt: string | null;
+            };
+          }
+        | {
+            valid: false;
+            reason: string;
+          }
+      >;
 
       openGameFolder: (gamePath: string) => Promise<{
         success: boolean;
