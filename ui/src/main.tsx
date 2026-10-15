@@ -108,6 +108,33 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   const [previewActivation, setPreviewActivation] = useState(true);
+  const [checkingLicense, setCheckingLicense] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function checkSavedLicense() {
+      try {
+        const result = await window.electronAPI.getLicenseStatus();
+
+        if (active) {
+          setPreviewActivation(!result.valid);
+        }
+      } catch (error) {
+        console.error("Erro ao verificar licença salva:", error);
+      } finally {
+        if (active) {
+          setCheckingLicense(false);
+        }
+      }
+    }
+
+    checkSavedLicense();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activating, setActivating] = useState(false);
@@ -451,6 +478,18 @@ function App() {
     setSelected,
     setGames,
   });
+
+  if (checkingLicense) {
+    return (
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          background: "#050505",
+        }}
+      />
+    );
+  }
 
   if (previewActivation) {
     return (
