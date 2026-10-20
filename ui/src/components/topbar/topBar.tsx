@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 type Screen = "library" | "favorites" | "browse" | "settings" | "user";
 
@@ -8,6 +8,7 @@ type Props = {
   search: string;
   setSearch: (value: string) => void;
   assetUrl?: (value: string) => string;
+  trialRemainingSeconds?: number | null;
 };
 
 export default function TopBar({
@@ -15,8 +16,39 @@ export default function TopBar({
   setScreen,
   search,
   setSearch,
-  assetUrl,
+  trialRemainingSeconds = null,
 }: Props) {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [initial, setInitial] = useState("?");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfile() {
+      try {
+        const profile = await window.electronAPI.loadUserProfile();
+
+        if (!active) return;
+
+        setInitial(profile.displayName.trim().charAt(0).toUpperCase() || "?");
+
+        const avatar = await window.electronAPI.readUserAvatar();
+
+        if (active) {
+          setAvatarUrl(avatar);
+        }
+      } catch (error) {
+        console.error("[GameLabs] Erro ao carregar perfil no TopBar:", error);
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      active = false;
+    };
+  }, [screen]);
+
   const logoSrc = new URL(
     `${import.meta.env.BASE_URL}logo.png`,
     document.baseURI,
@@ -103,9 +135,43 @@ export default function TopBar({
           }}
         />
 
+        {trialRemainingSeconds !== null && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 14px",
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.06)",
+              border: `1px solid ${
+                trialRemainingSeconds <= 300 ? "#ef4444" : "#3b82f6"
+              }`,
+              color: trialRemainingSeconds <= 300 ? "#f87171" : "#93c5fd",
+              fontSize: 13,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            <span>⏱ Trial</span>
+
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>
+              {[
+                Math.floor(Math.max(0, trialRemainingSeconds) / 3600),
+                Math.floor((Math.max(0, trialRemainingSeconds) % 3600) / 60),
+                Math.max(0, trialRemainingSeconds) % 60,
+              ]
+                .map((value) => String(value).padStart(2, "0"))
+                .join(":")}
+            </span>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => setScreen("user")}
+          title="Perfil do jogador"
           style={{
             width: "42px",
             height: "42px",
@@ -119,9 +185,24 @@ export default function TopBar({
             fontSize: "18px",
             fontWeight: 700,
             cursor: "pointer",
+            overflow: "hidden",
+            padding: 0,
+            flexShrink: 0,
           }}
         >
-          J
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="Avatar do jogador"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+          ) : (
+            initial
+          )}
         </button>
       </div>
     </div>

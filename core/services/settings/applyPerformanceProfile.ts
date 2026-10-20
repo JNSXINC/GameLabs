@@ -1,21 +1,16 @@
 import { getPerformanceProfile } from "./getPerformanceProfile";
 import {
-    applyPerformanceTarget,
-    PerformanceTarget,
+  applyPerformanceTarget,
+  PerformanceTarget,
 } from "./performanceTargets";
 
 export function applyPerformanceProfile(
-    target: PerformanceTarget
+  target: PerformanceTarget,
+  executablePath?: string,
 ) {
-    const profile = getPerformanceProfile();
+  const profile = getPerformanceProfile();
 
-    console.log(
-        `Aplicando perfil de performance para ${target}:`,
-        profile
-    );
+  console.log(`[Performance] Aplicando perfil para ${target}:`, profile);
 
-    return applyPerformanceTarget(
-        target,
-        profile
-    );
+  return applyPerformanceTarget(target, profile, executablePath);
 }

@@ -2,14 +2,18 @@ import { useState } from "react";
 
 type ActivationViewProps = {
   onActivate: (license: string) => Promise<void>;
+  onStartTrial: () => Promise<void>;
   error?: string | null;
   activating?: boolean;
+  startingTrial?: boolean;
 };
 
 export default function ActivationView({
   onActivate,
+  onStartTrial,
   error = null,
   activating = false,
+  startingTrial = false,
 }: ActivationViewProps) {
   const [license, setLicense] = useState("");
 
@@ -120,6 +124,46 @@ export default function ActivationView({
             {activating ? "Validando..." : "Ativar GameLabs"}
           </button>
         </form>
+
+        <div
+          style={{
+            marginTop: 24,
+            paddingTop: 24,
+            borderTop: "1px solid rgba(255,255,255,0.12)",
+          }}
+        >
+          <p
+            style={{
+              color: "#94a3b8",
+              fontSize: 13,
+              marginBottom: 14,
+            }}
+          >
+            Ainda não possui uma licença?
+          </p>
+
+          <button
+            type="button"
+            onClick={onStartTrial}
+            disabled={startingTrial || activating}
+            style={{
+              width: "100%",
+              padding: 14,
+              borderRadius: 10,
+              border: "1px solid #334155",
+              background: "#1e293b",
+              color: "#fff",
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: startingTrial ? "wait" : "pointer",
+              opacity: startingTrial || activating ? 0.5 : 1,
+            }}
+          >
+            {startingTrial
+              ? "Verificando período gratuito..."
+              : "Experimentar grátis por 1 hora"}
+          </button>
+        </div>
 
         <p
           style={{

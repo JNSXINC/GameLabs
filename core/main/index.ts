@@ -186,19 +186,147 @@ function createWindow() {
   });
 }
 
+app.setName("GameLabs");
+
+const isTestMode = !app.isPackaged && process.env.GAMELABS_TEST_MODE === "1";
+
+app.setPath(
+  "userData",
+  path.join(app.getPath("appData"), isTestMode ? "GameLabs-Test" : "GameLabs"),
+);
+
+console.log("[GameLabs] Modo de teste:", isTestMode);
+console.log("[GameLabs] Diretório de dados:", app.getPath("userData"));
+
 app.whenReady().then(async () => {
-  app.setName("GameLabs");
-
-  app.setPath("userData", path.join(app.getPath("appData"), "GameLabs"));
-
   ensureGameLabsDirectories();
 
-  migrateLegacyGameLabsData();
+  if (!isTestMode) {
+    migrateLegacyGameLabsData();
+  }
 
   await setupDS4Integration();
 
   ipcMain.handle("licensing:get-device-fingerprint", async () => {
     return generateFingerprint();
+  });
+
+  ipcMain.handle("licensing:get-trial-status", async () => {
+    try {
+      const fingerprint = generateFingerprint();
+
+      const response = await fetch(
+        "https://ohwmbgbkwstdybhrjmdy.supabase.co/functions/v1/trial-license",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            deviceFingerprint: fingerprint,
+            action: "check",
+          }),
+          signal: AbortSignal.timeout(10000),
+        },
+      );
+
+      const data: unknown = await response.json();
+
+      if (!response.ok) {
+        console.error(
+          "[GameLabs] Falha na consulta da Trial:",
+          response.status,
+        );
+
+        return { error: "TRIAL_VERIFICATION_FAILED" };
+      }
+
+      if (
+        !data ||
+        typeof data !== "object" ||
+        !("status" in data) ||
+        !("remainingSeconds" in data) ||
+        (data.status !== "ACTIVE" && data.status !== "EXPIRED") ||
+        typeof data.remainingSeconds !== "number" ||
+        !Number.isFinite(data.remainingSeconds) ||
+        !("startedAt" in data) ||
+        typeof data.startedAt !== "string" ||
+        !("expiresAt" in data) ||
+        typeof data.expiresAt !== "string" ||
+        !("serverTime" in data) ||
+        typeof data.serverTime !== "string"
+      ) {
+        return { error: "INVALID_TRIAL_RESPONSE" };
+      }
+
+      return {
+        status: data.status,
+        startedAt: data.startedAt,
+        expiresAt: data.expiresAt,
+        serverTime: data.serverTime,
+        remainingSeconds: data.remainingSeconds,
+      };
+    } catch (error) {
+      console.error("[GameLabs] Erro ao consultar Trial:", error);
+
+      return { error: "TRIAL_SERVER_UNAVAILABLE" };
+    }
+  });
+
+  ipcMain.handle("licensing:start-trial", async () => {
+    try {
+      const fingerprint = generateFingerprint();
+
+      const response = await fetch(
+        "https://ohwmbgbkwstdybhrjmdy.supabase.co/functions/v1/trial-license",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            deviceFingerprint: fingerprint,
+            action: "start",
+          }),
+          signal: AbortSignal.timeout(10000),
+        },
+      );
+
+      if (!response.ok) {
+        return { error: "TRIAL_START_FAILED" };
+      }
+
+      const data: unknown = await response.json();
+
+      if (
+        !data ||
+        typeof data !== "object" ||
+        !("status" in data) ||
+        !("remainingSeconds" in data) ||
+        !("startedAt" in data) ||
+        !("expiresAt" in data) ||
+        !("serverTime" in data) ||
+        (data.status !== "ACTIVE" && data.status !== "EXPIRED") ||
+        typeof data.remainingSeconds !== "number" ||
+        !Number.isFinite(data.remainingSeconds) ||
+        typeof data.startedAt !== "string" ||
+        typeof data.expiresAt !== "string" ||
+        typeof data.serverTime !== "string"
+      ) {
+        return { error: "INVALID_TRIAL_RESPONSE" };
+      }
+
+      return {
+        status: data.status,
+        startedAt: data.startedAt,
+        expiresAt: data.expiresAt,
+        serverTime: data.serverTime,
+        remainingSeconds: data.remainingSeconds,
+      };
+    } catch (error) {
+      console.error("[GameLabs] Erro ao iniciar Trial:", error);
+      return { error: "TRIAL_SERVER_UNAVAILABLE" };
+    }
   });
 
   ipcMain.handle("licensing:get-status", async () => {

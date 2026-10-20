@@ -27,6 +27,7 @@ import type { ScannedGame } from "./types/scanner";
 const SCREEN_KEY = "gamelabs_screen";
 const SEARCH_KEY = "gamelabs_search";
 const SORT_KEY = "gamelabs_sort_mode";
+const TRIAL_STARTED_KEY = "gamelabs_trial_started";
 
 type SortMode = "az" | "za" | "platform" | "favorites";
 
@@ -109,6 +110,9 @@ function App() {
 
   const [previewActivation, setPreviewActivation] = useState(true);
   const [checkingLicense, setCheckingLicense] = useState(true);
+  const [accessType, setAccessType] = useState<"lifetime" | "trial" | null>(
+    null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -117,9 +121,40 @@ function App() {
       try {
         const result = await window.electronAPI.getLicenseStatus();
 
-        if (active) {
-          setPreviewActivation(!result.valid);
+        if (!active) return;
+
+        if (result.valid && result.license.type === "lifetime") {
+          setAccessType("lifetime");
+          setPreviewActivation(false);
+          return;
         }
+
+        {
+          const trial = await window.electronAPI.getTrialStatus();
+
+          if (!active) return;
+
+          if (
+            "status" in trial &&
+            trial.status === "ACTIVE" &&
+            trial.remainingSeconds > 0
+          ) {
+            const expiresAt = Date.now() + trial.remainingSeconds * 1000;
+
+            if (Number.isFinite(expiresAt)) {
+              trialDeadlineRef.current =
+                performance.now() + trial.remainingSeconds * 1000;
+
+              setTrialExpiresAt(expiresAt);
+              setAccessType("trial");
+              setPreviewActivation(false);
+              return;
+            }
+          }
+        }
+
+        setAccessType(null);
+        setPreviewActivation(true);
       } catch (error) {
         console.error("Erro ao verificar licença salva:", error);
       } finally {
@@ -139,6 +174,153 @@ function App() {
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activating, setActivating] = useState(false);
 
+  const [startingTrial, setStartingTrial] = useState(false);
+  const [trialExpiresAt, setTrialExpiresAt] = useState<number | null>(null);
+  const trialDeadlineRef = useRef<number | null>(null);
+  const [trialRemainingSeconds, setTrialRemainingSeconds] = useState<
+    number | null
+  >(null);
+
+  const handleStartTrial = async () => {
+    if (startingTrial || activating) return;
+
+    setStartingTrial(true);
+    setActivationError(null);
+
+    try {
+      const result = await window.electronAPI.startTrial();
+
+      if ("status" in result && result.status === "ACTIVE") {
+        const expiresAt = Date.now() + result.remainingSeconds * 1000;
+
+        if (!Number.isFinite(expiresAt) || result.remainingSeconds <= 0) {
+          setActivationError("Não foi possível validar o prazo da Trial.");
+          return;
+        }
+
+        try {
+          localStorage.setItem(TRIAL_STARTED_KEY, "true");
+        } catch (error) {
+          console.warn("Não foi possível registrar a Trial localmente:", error);
+        }
+
+        trialDeadlineRef.current =
+          performance.now() + result.remainingSeconds * 1000;
+
+        setTrialExpiresAt(expiresAt);
+        setAccessType("trial");
+        setPreviewActivation(false);
+        return;
+      }
+
+      if ("status" in result && result.status === "EXPIRED") {
+        setActivationError("Seu período gratuito de 1 hora já terminou.");
+        return;
+      }
+
+      setActivationError(
+        "Não foi possível verificar sua Trial. Confira sua conexão.",
+      );
+    } catch (error) {
+      console.error("Erro ao iniciar Trial:", error);
+      setActivationError(
+        "Não foi possível conectar ao servidor de licenciamento.",
+      );
+    } finally {
+      setStartingTrial(false);
+    }
+  };
+
+  useEffect(() => {
+    if (accessType !== "trial" || trialExpiresAt === null) return;
+
+    const checkExpiration = () => {
+      const deadline = trialDeadlineRef.current;
+
+      if (deadline !== null) {
+        setTrialRemainingSeconds(
+          Math.max(0, Math.ceil((deadline - performance.now()) / 1000)),
+        );
+      }
+      if (
+        trialDeadlineRef.current !== null &&
+        performance.now() >= trialDeadlineRef.current
+      ) {
+        setAccessType(null);
+        setTrialExpiresAt(null);
+        setPreviewActivation(true);
+        setActivationError("Seu período gratuito de 1 hora terminou.");
+      }
+    };
+
+    checkExpiration();
+
+    const interval = setInterval(checkExpiration, 1000);
+
+    return () => clearInterval(interval);
+  }, [accessType, trialExpiresAt]);
+
+  useEffect(() => {
+    if (accessType !== "trial") return;
+
+    let active = true;
+    let checking = false;
+
+    const verifyTrial = async () => {
+      if (checking) return;
+      checking = true;
+
+      try {
+        const result = await window.electronAPI.startTrial();
+
+        if (!active) return;
+
+        if (
+          !("status" in result) ||
+          result.status !== "ACTIVE" ||
+          result.remainingSeconds <= 0
+        ) {
+          setAccessType(null);
+          setTrialExpiresAt(null);
+          setPreviewActivation(true);
+          setActivationError("Sua Trial expirou ou não pôde ser verificada.");
+          return;
+        }
+
+        const expiresAt = Date.now() + result.remainingSeconds * 1000;
+
+        if (!Number.isFinite(expiresAt)) {
+          setAccessType(null);
+          setTrialExpiresAt(null);
+          setPreviewActivation(true);
+          setActivationError("Resposta inválida do servidor.");
+          return;
+        }
+        trialDeadlineRef.current =
+          performance.now() + result.remainingSeconds * 1000;
+
+        setTrialExpiresAt(expiresAt);
+      } catch (error) {
+        if (!active) return;
+
+        console.error("Erro ao revalidar Trial:", error);
+        setAccessType(null);
+        setTrialExpiresAt(null);
+        setPreviewActivation(true);
+        setActivationError("Não foi possível verificar sua Trial online.");
+      } finally {
+        checking = false;
+      }
+    };
+
+    const interval = setInterval(verifyTrial, 30000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [accessType]);
+
   const handleActivateLicense = async (licenseText: string) => {
     if (activating) return;
 
@@ -151,6 +333,7 @@ function App() {
       const result = await window.electronAPI.activateLicense(license);
 
       if (result.valid) {
+        setAccessType("lifetime");
         setPreviewActivation(false);
         return;
       }
@@ -495,8 +678,10 @@ function App() {
     return (
       <ActivationView
         onActivate={handleActivateLicense}
+        onStartTrial={handleStartTrial}
         error={activationError}
         activating={activating}
+        startingTrial={startingTrial}
       />
     );
   }
@@ -581,6 +766,9 @@ function App() {
         setScreen={setScreen}
         search={search}
         setSearch={setSearch}
+        trialRemainingSeconds={
+          accessType === "trial" ? trialRemainingSeconds : null
+        }
       >
         <FavoritesView
           favorites={favorites}
@@ -602,6 +790,9 @@ function App() {
         setScreen={setScreen}
         search={search}
         setSearch={setSearch}
+        trialRemainingSeconds={
+          accessType === "trial" ? trialRemainingSeconds : null
+        }
       >
         <SortSelector sortMode={sortMode} setSortMode={setSortMode} />
 
@@ -663,6 +854,9 @@ function App() {
       setScreen={setScreen}
       search={search}
       setSearch={setSearch}
+      trialRemainingSeconds={
+        accessType === "trial" ? trialRemainingSeconds : null
+      }
     >
       <SortSelector sortMode={sortMode} setSortMode={setSortMode} />
 

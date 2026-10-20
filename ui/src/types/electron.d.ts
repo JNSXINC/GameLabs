@@ -70,6 +70,32 @@ declare global {
 
       getDeviceFingerprint: () => Promise<string>;
 
+      getTrialStatus: () => Promise<
+        | {
+            status: "ACTIVE" | "EXPIRED";
+            startedAt: string;
+            expiresAt: string;
+            serverTime: string;
+            remainingSeconds: number;
+          }
+        | {
+            error: string;
+          }
+      >;
+
+      startTrial: () => Promise<
+        | {
+            status: "ACTIVE" | "EXPIRED";
+            startedAt: string;
+            expiresAt: string;
+            serverTime: string;
+            remainingSeconds: number;
+          }
+        | {
+            error: string;
+          }
+      >;
+
       getLicenseStatus: () => Promise<
         | {
             valid: true;

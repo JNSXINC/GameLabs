@@ -23,7 +23,14 @@ export function getUserDataPath(): string {
 }
 
 export function getGameLabsInstallPath(): string {
-  return path.join(app.getPath("appData"), "..", "Local", "GameLabs");
+  const isTestMode = !app.isPackaged && process.env.GAMELABS_TEST_MODE === "1";
+
+  return path.join(
+    app.getPath("appData"),
+    "..",
+    "Local",
+    isTestMode ? "GameLabs-Test" : "GameLabs",
+  );
 }
 
 export function getEmulatorsInstallPath(): string {
@@ -39,6 +46,7 @@ export function ensureGameLabsDirectories(): void {
     getGameLabsDataPath(),
     getPreferencesPath(),
     getLibraryDataPath(),
+    getUserDataPath(),
     getEmulatorsInstallPath(),
     getDownloadsTempPath(),
   ];

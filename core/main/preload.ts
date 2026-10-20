@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return ipcRenderer.invoke("licensing:get-device-fingerprint");
   },
 
+  getTrialStatus: () => ipcRenderer.invoke("licensing:get-trial-status"),
+
+  startTrial: () => ipcRenderer.invoke("licensing:start-trial"),
+
   getLicenseStatus: () => ipcRenderer.invoke("licensing:get-status"),
 
   activateLicense: (license: unknown) =>
