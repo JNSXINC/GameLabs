@@ -4,7 +4,8 @@ import * as path from "node:path";
 
 import type { PerformanceProfile } from "../../settings/performanceProfiles";
 import { app } from "electron";
-import { execFileSync } from "node:child_process";
+import { updateIniValue } from "./iniUtils";
+import { isEmulatorRunning } from "./emulatorProcess";
 
 function findPCSX2Config(executablePath?: string): string | null {
   const candidates: string[] = [];
@@ -26,81 +27,8 @@ function findPCSX2Config(executablePath?: string): string | null {
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
 
-export function updateIniValue(
-  content: string,
-  section: string,
-  key: string,
-  value: string,
-): string {
-  const lines = content.split(/\r?\n/);
-  let currentSection = "";
-  let sectionFound = false;
-  let keyFound = false;
-
-  const updated = lines.map((line) => {
-    const sectionMatch = line.match(/^\s*\[([^\]]+)\]\s*$/);
-
-    if (sectionMatch) {
-      currentSection = sectionMatch[1];
-      if (currentSection === section) {
-        sectionFound = true;
-      }
-      return line;
-    }
-
-    if (
-      currentSection === section &&
-      line.match(/^\s*([^=]+?)\s*=/)?.[1].trim() === key
-    ) {
-      keyFound = true;
-      return `${key} = ${value}`;
-    }
-
-    return line;
-  });
-
-  if (!sectionFound) {
-    return [...updated, "", `[${section}]`, `${key} = ${value}`].join("\r\n");
-  }
-
-  if (!keyFound) {
-    const sectionIndex = updated.findIndex(
-      (line) => line.trim() === `[${section}]`,
-    );
-
-    updated.splice(sectionIndex + 1, 0, `${key} = ${value}`);
-  }
-
-  return updated.join("\r\n");
-}
-
 function isPCSX2Running(): boolean {
-  if (process.platform !== "win32") {
-    return false;
-  }
-
-  try {
-    const output = execFileSync("tasklist", ["/FO", "CSV", "/NH"], {
-      encoding: "utf8",
-      windowsHide: true,
-      timeout: 5000,
-    });
-
-    return output.split(/\r?\n/).some((line) => {
-      const imageName = line.match(/^"([^"]+)"/)?.[1];
-
-      return (
-        imageName?.toLowerCase() === "pcsx2-qt.exe" ||
-        imageName?.toLowerCase() === "pcsx2.exe"
-      );
-    });
-  } catch (error) {
-    console.error("[PCSX2] Falha ao verificar o processo:", error);
-
-    throw new Error(
-      "[PCSX2] Não foi possível verificar se o emulador está em execução.",
-    );
-  }
+  return isEmulatorRunning(["pcsx2-qt.exe", "pcsx2.exe"]);
 }
 
 export function applyPCSX2Config(

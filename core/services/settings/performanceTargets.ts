@@ -1,5 +1,6 @@
 import { PerformanceProfile } from "./performanceProfiles";
 import { applyPCSX2Config } from "../emulators/config/pcsx2Config";
+import { applyDuckStationConfig } from "../emulators/config/duckstationConfig";
 
 export type PerformanceTarget =
   | "duckstation"
@@ -17,7 +18,7 @@ export function applyPerformanceTarget(
 
   switch (target) {
     case "duckstation":
-      return applyDuckStationProfile(profile);
+      return applyDuckStationProfile(profile, executablePath);
 
     case "pcsx2":
       return applyPCSX2Profile(profile, executablePath);
@@ -33,8 +34,13 @@ export function applyPerformanceTarget(
   }
 }
 
-function applyDuckStationProfile(profile: PerformanceProfile) {
-  return profile;
+function applyDuckStationProfile(
+  profile: PerformanceProfile,
+  executablePath?: string,
+) {
+  console.log("[DuckStation] Aplicando perfil automático:", profile);
+
+  return applyDuckStationConfig(profile, executablePath);
 }
 
 function applyPCSX2Profile(
