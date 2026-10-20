@@ -26,7 +26,7 @@ function findPCSX2Config(executablePath?: string): string | null {
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
 
-function updateIniValue(
+export function updateIniValue(
   content: string,
   section: string,
   key: string,
@@ -59,8 +59,16 @@ function updateIniValue(
     return line;
   });
 
-  if (!sectionFound || !keyFound) {
-    throw new Error(`Configuração não encontrada: [${section}] ${key}`);
+  if (!sectionFound) {
+    return [...updated, "", `[${section}]`, `${key} = ${value}`].join("\r\n");
+  }
+
+  if (!keyFound) {
+    const sectionIndex = updated.findIndex(
+      (line) => line.trim() === `[${section}]`,
+    );
+
+    updated.splice(sectionIndex + 1, 0, `${key} = ${value}`);
   }
 
   return updated.join("\r\n");
@@ -122,6 +130,9 @@ export function applyPCSX2Config(
 
   let updated = original;
 
+  // Define português brasileiro como idioma padrão do PCSX2.
+  updated = updateIniValue(updated, "UI", "Language", "pt-BR");
+
   updated = updateIniValue(
     updated,
     "EmuCore/GS",
@@ -134,6 +145,13 @@ export function applyPCSX2Config(
     "EmuCore/GS",
     "MaxAnisotropy",
     profile.anisotropicFiltering ? "8" : "0",
+  );
+
+  updated = updateIniValue(
+    updated,
+    "EmuCore/GS",
+    "fxaa",
+    profile.antiAliasing ? "true" : "false",
   );
 
   // Mantemos as demais opções gráficas, BIOS e controles intactos.
