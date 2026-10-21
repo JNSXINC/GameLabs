@@ -33,11 +33,12 @@ export default function GameCard({
       onMouseEnter={onHover}
       onClick={onClick}
       style={{
-        width: isLibrary ? (isActive ? "440px" : "160px") : "100%",
-        height: isLibrary ? (isActive ? "245px" : "200px") : "270px",
+        width: isLibrary ? (isActive ? "210px" : "180px") : "100%",
+        height: isLibrary ? (isActive ? "315px" : "270px") : "270px",
         flexShrink: 0,
         cursor: "pointer",
-        transition: "transform 0.22s ease, box-shadow 0.22s ease, border 0.22s ease, opacity 0.22s ease",
+        transition:
+          "transform 0.22s ease, box-shadow 0.22s ease, border 0.22s ease, opacity 0.22s ease",
         position: "relative",
         borderRadius: "14px",
         overflow: "hidden",
@@ -70,7 +71,7 @@ export default function GameCard({
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "contain",
+          objectFit: "cover",
           background: "#000",
           display: "block",
         }}

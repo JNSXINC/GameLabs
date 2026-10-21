@@ -25,10 +25,8 @@ type Props = {
   onClearGames: () => void;
   onRemoveGameFromSystem: (gameId: string) => void;
   onImportGameFile: () => void | Promise<void>;
-  onUpdateGame: (
-  gameId: string,
-  patch: Partial<Game>
-) => void | Promise<void>;
+  onUpdateGame: (gameId: string, patch: Partial<Game>) => void | Promise<void>;
+  gamepadFocusId: string | null;
 };
 
 export default function BrowseView({
@@ -48,6 +46,7 @@ export default function BrowseView({
   onRemoveGameFromSystem,
   onImportGameFile,
   onUpdateGame,
+  gamepadFocusId,
 }: Props) {
   const [scannedGames, setScannedGames] = useState<ScannedGame[]>([]);
   const [showScannedPanel, setShowScannedPanel] = useState(true);
@@ -92,7 +91,7 @@ export default function BrowseView({
 
   function handleClearScannedGames() {
     const confirmed = window.confirm(
-      "Tem certeza que deseja limpar apenas os resultados visuais do scanner?"
+      "Tem certeza que deseja limpar apenas os resultados visuais do scanner?",
     );
 
     if (!confirmed) return;
@@ -103,7 +102,7 @@ export default function BrowseView({
 
   function handleClearTests() {
     const confirmed = window.confirm(
-      "Tem certeza que deseja limpar os testes?\n\nIsso vai remover os jogos de teste do sistema e também limpar a lista visual do scanner."
+      "Tem certeza que deseja limpar os testes?\n\nIsso vai remover os jogos de teste do sistema e também limpar a lista visual do scanner.",
     );
 
     if (!confirmed) return;
@@ -115,19 +114,19 @@ export default function BrowseView({
 
   function handleRemoveScannedSlot(scannedGame: ScannedGame) {
     const confirmed = window.confirm(
-      `Tem certeza que deseja remover o slot de "${scannedGame.name}"?\n\nEssa ação não pode ser desfeita.`
+      `Tem certeza que deseja remover o slot de "${scannedGame.name}"?\n\nEssa ação não pode ser desfeita.`,
     );
 
     if (!confirmed) return;
 
     setScannedGames((prev) =>
-      prev.filter((game) => game.id !== scannedGame.id)
+      prev.filter((game) => game.id !== scannedGame.id),
     );
   }
 
   function handleRemoveFromLibrary(game: Game) {
     const confirmed = window.confirm(
-      `Tem certeza que deseja remover "${game.name}" da biblioteca?\n\nEssa ação não pode ser desfeita.`
+      `Tem certeza que deseja remover "${game.name}" da biblioteca?\n\nEssa ação não pode ser desfeita.`,
     );
 
     if (!confirmed) return;
@@ -140,14 +139,18 @@ export default function BrowseView({
     <div style={{ padding: "34px 42px" }}>
       <h1 style={{ marginTop: 0, fontSize: "42px" }}>Browse</h1>
 
-      <div style={{ marginTop: "16px", marginBottom: "20px", maxWidth: "280px" }}>
+      <div
+        style={{
+          marginTop: "16px",
+          marginBottom: "20px",
+          maxWidth: "280px",
+        }}
+      >
         <ActionButton onClick={handleScanFolder}>
           Escanear pasta de jogos
         </ActionButton>
 
-        <ActionButton onClick={onImportGameFile}>
-          Importar jogo
-        </ActionButton>
+        <ActionButton onClick={onImportGameFile}>Importar jogo</ActionButton>
       </div>
 
       {showScannedPanel && scannedGames.length > 0 && (
@@ -161,7 +164,6 @@ export default function BrowseView({
             position: "relative",
           }}
         >
-          {/* BOTÃO X */}
           <button
             onClick={() => setShowScannedPanel(false)}
             style={{
@@ -183,7 +185,14 @@ export default function BrowseView({
             Jogos encontrados
           </h3>
 
-          <div style={{ display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              marginBottom: "16px",
+              flexWrap: "wrap",
+            }}
+          >
             <ActionButton variant="primary" onClick={handleAddAllScannedGames}>
               Adicionar todos
             </ActionButton>
@@ -205,7 +214,13 @@ export default function BrowseView({
             </ActionButton>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
             {scannedGames.map((scannedGame) => (
               <div
                 key={scannedGame.id}
@@ -221,15 +236,24 @@ export default function BrowseView({
               >
                 <strong>{scannedGame.name}</strong>
 
-                <div style={{ opacity: 0.7 }}>
-                  {scannedGame.executablePath}
-                </div>
+                <div style={{ opacity: 0.7 }}>{scannedGame.executablePath}</div>
 
-                <div style={{ opacity: 0.55, fontSize: "12px" }}>
+                <div
+                  style={{
+                    opacity: 0.55,
+                    fontSize: "12px",
+                  }}
+                >
                   Plataforma: {scannedGame.platform}
                 </div>
 
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap",
+                  }}
+                >
                   <ActionButton
                     variant="primary"
                     onClick={() => handleAddScannedGame(scannedGame)}
@@ -251,6 +275,7 @@ export default function BrowseView({
       )}
 
       <div
+        data-gamepad-grid="browse"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
@@ -260,13 +285,26 @@ export default function BrowseView({
       >
         {games.map((game) => {
           const active = browseMenuId === game.id;
+          const gamepadActive = gamepadFocusId === game.id;
           const status = gameStatus[game.id] ?? "none";
 
           return (
-            <div key={game.id} style={{ position: "relative" }}>
+            <div
+              key={game.id}
+              data-gamepad-card
+              style={{
+                position: "relative",
+                borderRadius: "14px",
+                outline: gamepadActive
+                  ? "2px solid rgba(255,255,255,0.85)"
+                  : "2px solid transparent",
+                outlineOffset: "5px",
+                transition: "outline-color 0.15s ease",
+              }}
+            >
               <GameCard
                 game={game}
-                isActive={active}
+                isActive={active || gamepadActive}
                 onClick={() =>
                   setBrowseMenuId(browseMenuId === game.id ? null : game.id)
                 }

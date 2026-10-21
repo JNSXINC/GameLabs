@@ -11,6 +11,7 @@ import UserView from "./views/user/UserView";
 import ActivationView from "./views/settings/licensing/ActivationView";
 
 import { useFavorites } from "./hooks/useFavorites";
+import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
 import { useGameValidation } from "./hooks/useGameValidation";
 import { useGameLauncher } from "./hooks/useGameLauncher";
 import { useGamePersistence } from "./hooks/useGamePersistence";
@@ -360,19 +361,14 @@ function App() {
     }
   };
 
-  const { games, setGames, favorites, toggleFavorite } = useFavorites(
-    (baseGames as Game[]).map((game) => ({
-      ...game,
-      path: game.path || "",
-    })),
-  );
+  const { games, setGames, favorites, toggleFavorite } = useFavorites([]);
 
   useEffect(() => {
     async function loadSavedLibrary() {
       try {
         const savedGames = await window.electronAPI.loadLibrary();
 
-        if (Array.isArray(savedGames) && savedGames.length > 0) {
+        if (Array.isArray(savedGames)) {
           setGames(savedGames);
         }
       } catch (error) {
@@ -429,6 +425,9 @@ function App() {
   });
 
   const [selected, setSelected] = useState(0);
+
+  const [gamepadFocusId, setGamepadFocusId] = useState<string | null>(null);
+  const [gamepadArea, setGamepadArea] = useState<"games" | "topbar">("games");
 
   const [search, setSearch] = useState(() => {
     try {
@@ -577,10 +576,14 @@ function App() {
 
     if (!selectedItem) return;
 
-    selectedItem.scrollIntoView({
+    const targetLeft =
+      selectedItem.offsetLeft +
+      selectedItem.offsetWidth / 2 -
+      container.clientWidth / 2;
+
+    container.scrollTo({
+      left: targetLeft,
       behavior: "smooth",
-      inline: "center",
-      block: "nearest",
     });
   }, [realIndex, screen, totalLibraryGames, infiniteCenterOffset]);
 
@@ -653,13 +656,214 @@ function App() {
     });
   };
 
-  const { handleLaunchGame } = useGameLauncher({
+  const { handleLaunchGame, isLaunching } = useGameLauncher({
     gameStatus,
     filteredLibraryGames,
     emulators,
     setScreen,
     setSelected,
     setGames,
+  });
+
+  const gamepadGridGames =
+    screen === "favorites"
+      ? favorites
+      : screen === "browse"
+        ? filteredBrowseGames
+        : [];
+
+  const gamepadGridIndex = gamepadGridGames.findIndex(
+    (game) => game.id === gamepadFocusId,
+  );
+
+  const moveGamepadGrid = (direction: "left" | "right" | "up" | "down") => {
+    if (gamepadGridGames.length === 0) return;
+
+    const grid = document.querySelector<HTMLElement>(
+      `[data-gamepad-grid="${screen}"]`,
+    );
+
+    const cards = grid
+      ? Array.from(grid.querySelectorAll<HTMLElement>("[data-gamepad-card]"))
+      : [];
+
+    const currentIndex = Math.max(0, gamepadGridIndex);
+    let nextIndex = currentIndex;
+
+    if (direction === "left") {
+      nextIndex = Math.max(0, currentIndex - 1);
+    } else if (direction === "right") {
+      nextIndex = Math.min(gamepadGridGames.length - 1, currentIndex + 1);
+    } else {
+      const currentCard = cards[currentIndex];
+
+      if (currentCard) {
+        const currentRect = currentCard.getBoundingClientRect();
+        const currentX = currentRect.left + currentRect.width / 2;
+        const currentY = currentRect.top + currentRect.height / 2;
+
+        const candidates = cards
+          .map((card, index) => {
+            const rect = card.getBoundingClientRect();
+
+            return {
+              index,
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+            };
+          })
+          .filter((candidate) =>
+            direction === "down"
+              ? candidate.y > currentY + 10
+              : candidate.y < currentY - 10,
+          )
+          .sort((a, b) => {
+            const distanceA =
+              Math.abs(a.x - currentX) + Math.abs(a.y - currentY) * 0.25;
+
+            const distanceB =
+              Math.abs(b.x - currentX) + Math.abs(b.y - currentY) * 0.25;
+
+            return distanceA - distanceB;
+          });
+
+        if (candidates.length > 0) {
+          nextIndex = candidates[0].index;
+        } else if (direction === "up") {
+          setGamepadArea("topbar");
+
+          document
+            .querySelector<HTMLElement>("[data-gamepad-grid-scroll]")
+            ?.scrollTo({ top: 0, behavior: "smooth" });
+
+          return;
+        }
+      }
+    }
+
+    const nextGame = gamepadGridGames[nextIndex];
+
+    if (nextGame) {
+      setGamepadFocusId(nextGame.id);
+
+      const card = cards[nextIndex];
+
+      if (card) {
+        const scrollContainer = card.closest<HTMLElement>(
+          "[data-gamepad-grid-scroll]",
+        );
+
+        if (scrollContainer) {
+          const cardRect = card.getBoundingClientRect();
+          const containerRect = scrollContainer.getBoundingClientRect();
+
+          if (cardRect.bottom > containerRect.bottom) {
+            scrollContainer.scrollTop +=
+              cardRect.bottom - containerRect.bottom + 12;
+          } else if (cardRect.top < containerRect.top) {
+            scrollContainer.scrollTop -= containerRect.top - cardRect.top + 12;
+          }
+        }
+      }
+    }
+  };
+
+  useGamepadNavigation({
+    enabled: !isLaunching && !checkingLicense && !previewActivation,
+
+    onLeft: () => {
+      if (gamepadArea === "topbar") {
+        const tabs: Screen[] = ["library", "favorites", "browse", "settings"];
+
+        const index = tabs.indexOf(screen);
+
+        setScreen(
+          tabs[index < 0 ? 0 : (index - 1 + tabs.length) % tabs.length],
+        );
+
+        return;
+      }
+
+      if (screen === "library") {
+        setSelected((prev) => prev - 1);
+      } else if (screen === "favorites" || screen === "browse") {
+        moveGamepadGrid("left");
+      }
+    },
+
+    onRight: () => {
+      if (gamepadArea === "topbar") {
+        const tabs: Screen[] = ["library", "favorites", "browse", "settings"];
+
+        const index = tabs.indexOf(screen);
+
+        setScreen(tabs[index < 0 ? 0 : (index + 1) % tabs.length]);
+
+        return;
+      }
+
+      if (screen === "library") {
+        setSelected((prev) => prev + 1);
+      } else if (screen === "favorites" || screen === "browse") {
+        moveGamepadGrid("right");
+      }
+    },
+
+    onUp: () => {
+      if (gamepadArea === "topbar") return;
+
+      if (screen === "favorites" || screen === "browse") {
+        moveGamepadGrid("up");
+      } else if (screen === "library") {
+        setGamepadArea("topbar");
+      }
+    },
+
+    onDown: () => {
+      if (gamepadArea === "topbar") {
+        setGamepadArea("games");
+        return;
+      }
+
+      if (screen === "favorites" || screen === "browse") {
+        moveGamepadGrid("down");
+      }
+    },
+
+    onConfirm: () => {
+      if (gamepadArea === "topbar") {
+        setGamepadArea("games");
+        return;
+      }
+      const game =
+        screen === "library"
+          ? filteredLibraryGames[realIndex]
+          : screen === "favorites" || screen === "browse"
+            ? gamepadGridGames[Math.max(0, gamepadGridIndex)]
+            : null;
+
+      if (game) {
+        void handleLaunchGame(game);
+      }
+    },
+
+    onBack: () => {
+      if (screen !== "library") {
+        setScreen("library");
+      }
+    },
+
+    onNextTab: () => {
+      const tabs: Screen[] = ["library", "favorites", "browse", "settings"];
+      const index = tabs.indexOf(screen);
+      setScreen(tabs[index < 0 ? 0 : (index + 1) % tabs.length]);
+    },
+
+    onPreviousTab: () => {
+      const tabs: Screen[] = ["library", "favorites", "browse", "settings"];
+      const index = tabs.indexOf(screen);
+      setScreen(tabs[index < 0 ? 0 : (index - 1 + tabs.length) % tabs.length]);
+    },
   });
 
   if (checkingLicense) {
@@ -766,6 +970,7 @@ function App() {
         setScreen={setScreen}
         search={search}
         setSearch={setSearch}
+        gamepadArea={gamepadArea}
         trialRemainingSeconds={
           accessType === "trial" ? trialRemainingSeconds : null
         }
@@ -778,6 +983,7 @@ function App() {
           favoritesMenuId={favoritesMenuId}
           setFavoritesMenuId={setFavoritesMenuId}
           assetUrl={assetUrl}
+          gamepadFocusId={gamepadArea === "games" ? gamepadFocusId : null}
         />
       </AppLayout>
     );
@@ -790,6 +996,7 @@ function App() {
         setScreen={setScreen}
         search={search}
         setSearch={setSearch}
+        gamepadArea={gamepadArea}
         trialRemainingSeconds={
           accessType === "trial" ? trialRemainingSeconds : null
         }
@@ -813,6 +1020,7 @@ function App() {
           onRemoveGameFromSystem={handleRemoveGameFromSystem}
           onImportGameFile={importGameFile}
           onUpdateGame={onUpdateGame}
+          gamepadFocusId={gamepadArea === "games" ? gamepadFocusId : null}
         />
       </AppLayout>
     );
@@ -825,6 +1033,7 @@ function App() {
         setScreen={setScreen}
         search={search}
         setSearch={setSearch}
+        gamepadArea={gamepadArea}
       >
         <SettingsView
           emulators={emulators}
@@ -842,6 +1051,7 @@ function App() {
         setScreen={setScreen}
         search={search}
         setSearch={setSearch}
+        gamepadArea={gamepadArea}
       >
         <UserView favorites={favorites} games={games} />
       </AppLayout>
@@ -854,6 +1064,7 @@ function App() {
       setScreen={setScreen}
       search={search}
       setSearch={setSearch}
+      gamepadArea={gamepadArea}
       trialRemainingSeconds={
         accessType === "trial" ? trialRemainingSeconds : null
       }
@@ -876,5 +1087,27 @@ function App() {
     </AppLayout>
   );
 }
+
+const globalStyle = document.createElement("style");
+
+globalStyle.textContent = `
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+  }
+
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+`;
+
+document.head.appendChild(globalStyle);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

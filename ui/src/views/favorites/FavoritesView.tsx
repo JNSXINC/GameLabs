@@ -13,6 +13,7 @@ type Props = {
   favoritesMenuId: string | null;
   setFavoritesMenuId: (id: string | null) => void;
   assetUrl: (value: string) => string;
+  gamepadFocusId: string | null;
 };
 
 export default function FavoritesView({
@@ -23,6 +24,7 @@ export default function FavoritesView({
   toggleFavorite,
   handleLaunchGame,
   assetUrl,
+  gamepadFocusId,
 }: Props) {
   const glassPanel: React.CSSProperties = {
     background: "rgba(7, 13, 28, 0.62)",
@@ -40,6 +42,7 @@ export default function FavoritesView({
       <h1 style={{ marginTop: 0, fontSize: "42px" }}>Favorites</h1>
 
       <div
+        data-gamepad-grid="favorites"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
@@ -49,15 +52,28 @@ export default function FavoritesView({
       >
         {favorites.map((game) => {
           const active = favoritesMenuId === game.id;
+          const gamepadActive = gamepadFocusId === game.id;
 
           return (
-            <div key={game.id} style={{ position: "relative" }}>
+            <div
+              key={game.id}
+              data-gamepad-card
+              style={{
+                position: "relative",
+                borderRadius: "14px",
+                outline: gamepadActive
+                  ? "2px solid rgba(255,255,255,0.85)"
+                  : "2px solid transparent",
+                outlineOffset: "5px",
+                transition: "outline-color 0.15s ease",
+              }}
+            >
               <GameCard
                 game={game}
-                isActive={active}
+                isActive={active || gamepadActive}
                 onClick={() =>
                   setFavoritesMenuId(
-                    favoritesMenuId === game.id ? null : game.id
+                    favoritesMenuId === game.id ? null : game.id,
                   )
                 }
                 assetUrl={assetUrl}

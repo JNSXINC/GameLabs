@@ -9,6 +9,7 @@ type Props = {
   setSearch: (value: string) => void;
   assetUrl?: (value: string) => string;
   trialRemainingSeconds?: number | null;
+  gamepadArea?: "games" | "topbar";
 };
 
 export default function TopBar({
@@ -17,6 +18,7 @@ export default function TopBar({
   search,
   setSearch,
   trialRemainingSeconds = null,
+  gamepadArea = "games",
 }: Props) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState("?");
@@ -57,12 +59,19 @@ export default function TopBar({
   const menuItemStyle = (active: boolean): React.CSSProperties => ({
     background: "transparent",
     border: "none",
-    fontSize: "16px",
+    fontSize: "19px",
     fontWeight: 600,
     cursor: "pointer",
     color: active ? "#ffffff" : "rgba(255,255,255,0.6)",
     borderBottom: active ? "2px solid #3b82f6" : "2px solid transparent",
     padding: "0 0 4px",
+    outline:
+      gamepadArea === "topbar" && active
+        ? "2px solid rgba(255,255,255,0.85)"
+        : "2px solid transparent",
+    outlineOffset: "7px",
+    borderRadius: "3px",
+    transition: "outline-color 0.15s ease",
   });
 
   return (
@@ -71,20 +80,48 @@ export default function TopBar({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "20px 32px",
+        gap: "24px",
+        padding: "12px 36px",
+        minHeight: "64px",
+        boxSizing: "border-box",
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
+        background: "rgba(3, 8, 20, 0.12)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "36px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "36px",
+          paddingLeft: "150px",
+        }}
+      >
         <img
           src={logoSrc}
           alt="GameLabs"
           style={{
-            width: "200px",
+            position: "absolute",
+            top: "0px",
+            left: "8px",
+            width: "420px",
+            height: "120px",
             objectFit: "contain",
+            objectPosition: "left center",
+            zIndex: 20,
+            pointerEvents: "none",
           }}
         />
 
-        <nav style={{ display: "flex", gap: "20px" }}>
+        <nav
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "24px",
+            transform: "translateY(12px)",
+          }}
+        >
           <button
             type="button"
             style={menuItemStyle(screen === "library")}
