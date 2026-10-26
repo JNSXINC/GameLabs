@@ -289,7 +289,15 @@ export default function EmulatorSettings({
           }}
         >
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => setActiveSection("emulators")}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setActiveSection("emulators");
+              }
+            }}
             style={sectionCardStyle("emulators")}
           >
             <h3 style={{ margin: 0 }}>Emuladores</h3>
@@ -298,7 +306,15 @@ export default function EmulatorSettings({
             </p>
           </div>
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => setActiveSection("bios")}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setActiveSection("bios");
+              }
+            }}
             style={sectionCardStyle("bios")}
           >
             <h3 style={{ margin: 0 }}>BIOS</h3>
@@ -307,7 +323,15 @@ export default function EmulatorSettings({
             </p>
           </div>
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => setActiveSection("performance")}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setActiveSection("performance");
+              }
+            }}
             style={sectionCardStyle("performance")}
           >
             <h3 style={{ margin: 0 }}>Performance</h3>
@@ -746,6 +770,7 @@ export default function EmulatorSettings({
             {["baixo", "equilibrado", "alto", "ultra"].map((preset) => (
               <button
                 key={preset}
+                data-gamepad-preset
                 type="button"
                 onClick={async () => {
                   setPerformancePreset(preset);

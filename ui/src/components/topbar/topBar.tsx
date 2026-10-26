@@ -10,6 +10,7 @@ type Props = {
   assetUrl?: (value: string) => string;
   trialRemainingSeconds?: number | null;
   gamepadArea?: "games" | "topbar";
+  gamepadTopbarFocus?: Screen | "search";
 };
 
 export default function TopBar({
@@ -19,6 +20,7 @@ export default function TopBar({
   setSearch,
   trialRemainingSeconds = null,
   gamepadArea = "games",
+  gamepadTopbarFocus = "library",
 }: Props) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState("?");
@@ -56,7 +58,10 @@ export default function TopBar({
     document.baseURI,
   ).href;
 
-  const menuItemStyle = (active: boolean): React.CSSProperties => ({
+  const menuItemStyle = (
+    active: boolean,
+    focused: boolean,
+  ): React.CSSProperties => ({
     background: "transparent",
     border: "none",
     fontSize: "19px",
@@ -66,7 +71,7 @@ export default function TopBar({
     borderBottom: active ? "2px solid #3b82f6" : "2px solid transparent",
     padding: "0 0 4px",
     outline:
-      gamepadArea === "topbar" && active
+      gamepadArea === "topbar" && focused
         ? "2px solid rgba(255,255,255,0.85)"
         : "2px solid transparent",
     outlineOffset: "7px",
@@ -124,7 +129,10 @@ export default function TopBar({
         >
           <button
             type="button"
-            style={menuItemStyle(screen === "library")}
+            style={menuItemStyle(
+              screen === "library",
+              gamepadTopbarFocus === "library",
+            )}
             onClick={() => setScreen("library")}
           >
             Library
@@ -132,7 +140,10 @@ export default function TopBar({
 
           <button
             type="button"
-            style={menuItemStyle(screen === "favorites")}
+            style={menuItemStyle(
+              screen === "favorites",
+              gamepadTopbarFocus === "favorites",
+            )}
             onClick={() => setScreen("favorites")}
           >
             Favorites
@@ -140,7 +151,10 @@ export default function TopBar({
 
           <button
             type="button"
-            style={menuItemStyle(screen === "browse")}
+            style={menuItemStyle(
+              screen === "browse",
+              gamepadTopbarFocus === "browse",
+            )}
             onClick={() => setScreen("browse")}
           >
             Browse
@@ -148,7 +162,10 @@ export default function TopBar({
 
           <button
             type="button"
-            style={menuItemStyle(screen === "settings")}
+            style={menuItemStyle(
+              screen === "settings",
+              gamepadTopbarFocus === "settings",
+            )}
             onClick={() => setScreen("settings")}
           >
             Settings
@@ -164,10 +181,14 @@ export default function TopBar({
           style={{
             background: "rgba(255,255,255,0.05)",
             border: "1px solid rgba(255,255,255,0.08)",
+            outline:
+              gamepadArea === "topbar" && gamepadTopbarFocus === "search"
+                ? "2px solid rgba(255,255,255,0.85)"
+                : "2px solid transparent",
+            outlineOffset: "3px",
             borderRadius: "999px",
             padding: "10px 16px",
             color: "white",
-            outline: "none",
             width: "240px",
           }}
         />
@@ -225,6 +246,11 @@ export default function TopBar({
             overflow: "hidden",
             padding: 0,
             flexShrink: 0,
+            outline:
+              gamepadArea === "topbar" && gamepadTopbarFocus === "user"
+                ? "2px solid rgba(255,255,255,0.85)"
+                : "2px solid transparent",
+            outlineOffset: "4px",
           }}
         >
           {avatarUrl ? (

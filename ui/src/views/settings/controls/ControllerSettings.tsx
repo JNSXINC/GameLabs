@@ -123,7 +123,10 @@ export default function ControllerSettings() {
   };
 
   return (
-    <div style={{ padding: 32, color: "#fff" }}>
+    <div
+      data-gamepad-controller-settings
+      style={{ padding: 32, color: "#fff" }}
+    >
       <h2>Controles</h2>
 
       <p style={{ opacity: 0.7 }}>

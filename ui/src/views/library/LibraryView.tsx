@@ -3,6 +3,11 @@ import { Game } from "../../types/game";
 import GameCard from "../../components/game/GameCard";
 import { formatPlaytime } from "../../utils/formatPlaytime";
 
+const hiddenScrollbarStyle: React.CSSProperties = {
+  scrollbarWidth: "none",
+  msOverflowStyle: "none",
+};
+
 type LibraryViewProps = {
   currentLibraryGame: Game | null;
   recentGames: Game[];
@@ -47,18 +52,12 @@ export default function LibraryView({
     );
   }
 
-  const bgSrc = currentLibraryGame.bg?.startsWith("data:image")
-    ? currentLibraryGame.bg
-    : assetUrl(currentLibraryGame.bg);
-
   return (
     <div
       style={{
         minHeight: "100vh",
         color: "white",
-        backgroundImage: `linear-gradient(rgba(5,10,20,0.45), rgba(5,10,20,0.88)), url("${bgSrc}")`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        background: "transparent",
       }}
     >
       <div style={{ padding: "24px 50px 40px" }}>
@@ -67,6 +66,9 @@ export default function LibraryView({
             display: "flex",
             gap: "0px",
             overflowX: "auto",
+
+            ...hiddenScrollbarStyle,
+
             scrollBehavior: "smooth",
             paddingBottom: "18px",
             alignItems: "center",
@@ -187,6 +189,9 @@ export default function LibraryView({
                   display: "flex",
                   gap: "14px",
                   overflowX: "auto",
+
+                  ...hiddenScrollbarStyle,
+
                   paddingBottom: "10px",
                   maxWidth: "760px",
                 }}

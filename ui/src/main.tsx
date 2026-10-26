@@ -111,9 +111,9 @@ function App() {
 
   const [previewActivation, setPreviewActivation] = useState(true);
   const [checkingLicense, setCheckingLicense] = useState(true);
-  const [accessType, setAccessType] = useState<"lifetime" | "trial" | null>(
-    null,
-  );
+  const [accessType, setAccessType] = useState<
+    "lifetime" | "monthly" | "trial" | null
+  >(null);
 
   useEffect(() => {
     let active = true;
@@ -124,8 +124,12 @@ function App() {
 
         if (!active) return;
 
-        if (result.valid && result.license.type === "lifetime") {
-          setAccessType("lifetime");
+        if (
+          result.valid &&
+          (result.license.type === "lifetime" ||
+            result.license.type === "monthly")
+        ) {
+          setAccessType(result.license.type);
           setPreviewActivation(false);
           return;
         }
@@ -171,6 +175,55 @@ function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (accessType !== "lifetime" && accessType !== "monthly") return;
+
+    let active = true;
+    let checking = false;
+
+    const verifyPaidLicense = async () => {
+      if (checking) return;
+
+      checking = true;
+
+      try {
+        const result = await window.electronAPI.getLicenseStatus();
+
+        if (!active) return;
+
+        if (!result.valid) {
+          // Erros de conexão não revogam licenças vitalícias.
+          // Bloqueamos somente quando a validação retorna inválida.
+          setAccessType(null);
+          setPreviewActivation(true);
+          const messages: Record<string, string> = {
+            LICENSE_REVOKED: "Esta licença foi revogada.",
+            LICENSE_EXPIRED:
+              "Sua licença expirou. Renove para continuar utilizando o GameLabs.",
+            LICENSE_INACTIVE: "Esta licença ainda não está ativa.",
+            LICENSE_SERVER_UNAVAILABLE:
+              "Não foi possível verificar sua assinatura. Confira sua conexão com a internet.",
+          };
+
+          setActivationError(
+            messages[result.reason] ?? "Sua licença não é mais válida.",
+          );
+        }
+      } catch (error) {
+        console.error("[GameLabs] Falha na verificação periódica:", error);
+      } finally {
+        checking = false;
+      }
+    };
+
+    const interval = setInterval(verifyPaidLicense, 60000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [accessType]);
 
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activating, setActivating] = useState(false);
@@ -334,8 +387,16 @@ function App() {
       const result = await window.electronAPI.activateLicense(license);
 
       if (result.valid) {
-        setAccessType("lifetime");
-        setPreviewActivation(false);
+        if (
+          result.license.type === "lifetime" ||
+          result.license.type === "monthly"
+        ) {
+          setAccessType(result.license.type);
+          setPreviewActivation(false);
+          return;
+        }
+
+        setActivationError("Tipo de licença não suportado nesta ativação.");
         return;
       }
 
@@ -428,6 +489,9 @@ function App() {
 
   const [gamepadFocusId, setGamepadFocusId] = useState<string | null>(null);
   const [gamepadArea, setGamepadArea] = useState<"games" | "topbar">("games");
+  const [gamepadTopbarFocus, setGamepadTopbarFocus] = useState<
+    Screen | "search"
+  >("library");
 
   const [search, setSearch] = useState(() => {
     try {
@@ -768,18 +832,96 @@ function App() {
     }
   };
 
+  const getSettingsButtons = (): HTMLElement[] => {
+    const container = document.querySelector("[data-gamepad-settings]");
+
+    if (!container) return [];
+
+    return Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input[type="checkbox"]:not(:disabled), [role="button"][tabindex="0"]',
+      ),
+    ).filter((element) => element.getClientRects().length > 0);
+  };
+
   useGamepadNavigation({
     enabled: !isLaunching && !checkingLicense && !previewActivation,
 
     onLeft: () => {
+      if (
+        document.activeElement?.matches('input[placeholder="Search games..."]')
+      ) {
+        return;
+      }
       if (gamepadArea === "topbar") {
-        const tabs: Screen[] = ["library", "favorites", "browse", "settings"];
+        const items: (Screen | "search")[] = [
+          "library",
+          "favorites",
+          "browse",
+          "settings",
+          "search",
+          "user",
+        ];
 
-        const index = tabs.indexOf(screen);
+        const index = items.indexOf(gamepadTopbarFocus);
 
-        setScreen(
-          tabs[index < 0 ? 0 : (index - 1 + tabs.length) % tabs.length],
+        setGamepadTopbarFocus(items[(index - 1 + items.length) % items.length]);
+
+        return;
+      }
+
+      if (screen === "settings") {
+        const activeButton = document.activeElement;
+
+        const biosGroup =
+          activeButton instanceof HTMLElement
+            ? activeButton.closest<HTMLElement>("[data-gamepad-bios-actions]")
+            : null;
+
+        if (biosGroup) {
+          const buttons = Array.from(
+            biosGroup.querySelectorAll<HTMLButtonElement>(
+              "button:not(:disabled)",
+            ),
+          );
+
+          const currentIndex = buttons.indexOf(
+            activeButton as HTMLButtonElement,
+          );
+
+          if (currentIndex > 0) {
+            buttons[currentIndex - 1].focus();
+          }
+
+          return;
+        }
+        const focused = document.activeElement as HTMLElement | null;
+
+        const presets = Array.from(
+          document.querySelectorAll<HTMLButtonElement>(
+            "[data-gamepad-settings-content] [data-gamepad-preset]",
+          ),
         );
+
+        const presetIndex = presets.indexOf(focused as HTMLButtonElement);
+
+        if (presetIndex >= 0) {
+          presets[Math.max(presetIndex - 1, 0)]?.focus();
+          return;
+        }
+        const cards = Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '[data-gamepad-settings-content] [role="button"][tabindex="0"]',
+          ),
+        );
+
+        const currentIndex = cards.indexOf(
+          document.activeElement as HTMLElement,
+        );
+
+        if (currentIndex > 0) {
+          cards[currentIndex - 1].focus();
+        }
 
         return;
       }
@@ -792,12 +934,81 @@ function App() {
     },
 
     onRight: () => {
+      if (
+        document.activeElement?.matches('input[placeholder="Search games..."]')
+      ) {
+        return;
+      }
       if (gamepadArea === "topbar") {
-        const tabs: Screen[] = ["library", "favorites", "browse", "settings"];
+        const items: (Screen | "search")[] = [
+          "library",
+          "favorites",
+          "browse",
+          "settings",
+          "search",
+          "user",
+        ];
 
-        const index = tabs.indexOf(screen);
+        const index = items.indexOf(gamepadTopbarFocus);
 
-        setScreen(tabs[index < 0 ? 0 : (index + 1) % tabs.length]);
+        setGamepadTopbarFocus(items[(index + 1) % items.length]);
+
+        return;
+      }
+
+      if (screen === "settings") {
+        const activeButton = document.activeElement;
+
+        const biosGroup =
+          activeButton instanceof HTMLElement
+            ? activeButton.closest<HTMLElement>("[data-gamepad-bios-actions]")
+            : null;
+
+        if (biosGroup) {
+          const buttons = Array.from(
+            biosGroup.querySelectorAll<HTMLButtonElement>(
+              "button:not(:disabled)",
+            ),
+          );
+
+          const currentIndex = buttons.indexOf(
+            activeButton as HTMLButtonElement,
+          );
+
+          if (currentIndex >= 0 && currentIndex < buttons.length - 1) {
+            buttons[currentIndex + 1].focus();
+          }
+
+          return;
+        }
+
+        const focused = document.activeElement as HTMLElement | null;
+
+        const presets = Array.from(
+          document.querySelectorAll<HTMLButtonElement>(
+            "[data-gamepad-settings-content] [data-gamepad-preset]",
+          ),
+        );
+
+        const presetIndex = presets.indexOf(focused as HTMLButtonElement);
+
+        if (presetIndex >= 0) {
+          presets[Math.min(presetIndex + 1, presets.length - 1)]?.focus();
+          return;
+        }
+        const cards = Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '[data-gamepad-settings-content] [role="button"][tabindex="0"]',
+          ),
+        );
+
+        const currentIndex = cards.indexOf(
+          document.activeElement as HTMLElement,
+        );
+
+        if (currentIndex >= 0 && currentIndex < cards.length - 1) {
+          cards[currentIndex + 1].focus();
+        }
 
         return;
       }
@@ -810,18 +1021,71 @@ function App() {
     },
 
     onUp: () => {
+      if (
+        document.activeElement?.matches('input[placeholder="Search games..."]')
+      ) {
+        return;
+      }
+
       if (gamepadArea === "topbar") return;
+
+      if (screen === "settings") {
+        const buttons = getSettingsButtons();
+
+        const currentIndex = buttons.indexOf(
+          document.activeElement as HTMLButtonElement,
+        );
+
+        if (currentIndex <= 0) {
+          document.activeElement instanceof HTMLElement &&
+            document.activeElement.blur();
+
+          setGamepadArea("topbar");
+          return;
+        }
+
+        buttons[currentIndex - 1]?.focus();
+        return;
+      }
 
       if (screen === "favorites" || screen === "browse") {
         moveGamepadGrid("up");
-      } else if (screen === "library") {
+      } else if (screen === "library" || screen === "user") {
         setGamepadArea("topbar");
       }
     },
 
     onDown: () => {
+      if (
+        document.activeElement?.matches('input[placeholder="Search games..."]')
+      ) {
+        return;
+      }
+
       if (gamepadArea === "topbar") {
         setGamepadArea("games");
+
+        if (screen === "settings") {
+          getSettingsButtons()[0]?.focus();
+        }
+
+        return;
+      }
+
+      if (screen === "settings") {
+        const buttons = getSettingsButtons();
+        if (buttons.length === 0) return;
+
+        const currentIndex = buttons.indexOf(
+          document.activeElement as HTMLElement,
+        );
+
+        const nextIndex =
+          currentIndex === -1
+            ? 0
+            : Math.min(currentIndex + 1, buttons.length - 1);
+
+        buttons[nextIndex]?.focus();
         return;
       }
 
@@ -831,10 +1095,42 @@ function App() {
     },
 
     onConfirm: () => {
+      if (
+        document.activeElement?.matches('input[placeholder="Search games..."]')
+      ) {
+        return;
+      }
+
       if (gamepadArea === "topbar") {
+        if (gamepadTopbarFocus === "search") {
+          document
+            .querySelector<HTMLInputElement>(
+              'input[placeholder="Search games..."]',
+            )
+            ?.focus();
+
+          return;
+        }
+
+        setScreen(gamepadTopbarFocus);
         setGamepadArea("games");
         return;
       }
+
+      if (screen === "settings") {
+        const buttons = getSettingsButtons();
+        const focusedButton = document.activeElement;
+
+        if (
+          focusedButton instanceof HTMLElement &&
+          buttons.includes(focusedButton)
+        ) {
+          focusedButton.click();
+        }
+
+        return;
+      }
+
       const game =
         screen === "library"
           ? filteredLibraryGames[realIndex]
@@ -848,6 +1144,29 @@ function App() {
     },
 
     onBack: () => {
+      const searchInput = document.querySelector<HTMLInputElement>(
+        'input[placeholder="Search games..."]',
+      );
+
+      if (document.activeElement === searchInput) {
+        searchInput?.blur();
+        return;
+      }
+
+      if (gamepadArea === "topbar") {
+        setGamepadArea("games");
+        return;
+      }
+
+      if (screen === "settings") {
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+
+        setGamepadArea("topbar");
+        return;
+      }
+
       if (screen !== "library") {
         setScreen("library");
       }
@@ -971,6 +1290,7 @@ function App() {
         search={search}
         setSearch={setSearch}
         gamepadArea={gamepadArea}
+        gamepadTopbarFocus={gamepadTopbarFocus}
         trialRemainingSeconds={
           accessType === "trial" ? trialRemainingSeconds : null
         }
@@ -997,6 +1317,7 @@ function App() {
         search={search}
         setSearch={setSearch}
         gamepadArea={gamepadArea}
+        gamepadTopbarFocus={gamepadTopbarFocus}
         trialRemainingSeconds={
           accessType === "trial" ? trialRemainingSeconds : null
         }
@@ -1034,6 +1355,7 @@ function App() {
         search={search}
         setSearch={setSearch}
         gamepadArea={gamepadArea}
+        gamepadTopbarFocus={gamepadTopbarFocus}
       >
         <SettingsView
           emulators={emulators}
@@ -1052,6 +1374,7 @@ function App() {
         search={search}
         setSearch={setSearch}
         gamepadArea={gamepadArea}
+        gamepadTopbarFocus={gamepadTopbarFocus}
       >
         <UserView favorites={favorites} games={games} />
       </AppLayout>
@@ -1065,6 +1388,7 @@ function App() {
       search={search}
       setSearch={setSearch}
       gamepadArea={gamepadArea}
+      gamepadTopbarFocus={gamepadTopbarFocus}
       trialRemainingSeconds={
         accessType === "trial" ? trialRemainingSeconds : null
       }

@@ -9,6 +9,7 @@ type Props = {
   setSearch: (value: string) => void;
   trialRemainingSeconds?: number | null;
   gamepadArea?: "games" | "topbar";
+  gamepadTopbarFocus?: Screen | "search";
   children: React.ReactNode;
 };
 
@@ -19,6 +20,7 @@ export default function AppLayout({
   setSearch,
   trialRemainingSeconds,
   gamepadArea = "games",
+  gamepadTopbarFocus = "library",
   children,
 }: Props) {
   return (
@@ -64,6 +66,7 @@ export default function AppLayout({
           setSearch={setSearch}
           trialRemainingSeconds={trialRemainingSeconds}
           gamepadArea={gamepadArea}
+          gamepadTopbarFocus={gamepadTopbarFocus}
         />
       </div>
 
