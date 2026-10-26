@@ -44,6 +44,8 @@ function signFile(filePath, successMessage) {
 
 module.exports = {
   packagerConfig: {
+    icon: path.join(__dirname, "assets", "icon"),
+
     asar: {
       unpack: "**/node_modules/7zip-bin/win/x64/7za.exe",
     },

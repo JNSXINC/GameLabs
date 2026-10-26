@@ -160,6 +160,7 @@ function recommendPerformancePreset(ramGb: number, gpuName: string) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
+    icon: path.join(process.cwd(), "assets", "icon.ico"),
     width: 1440,
     height: 900,
     minWidth: 1100,
