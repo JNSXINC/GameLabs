@@ -17,7 +17,9 @@ function isLicensePayload(value: unknown): value is LicensePayload {
     data.schemaVersion === 1 &&
     typeof data.licenseId === "string" &&
     data.licenseId.length > 0 &&
-    (data.type === "trial" || data.type === "lifetime") &&
+    (data.type === "trial" ||
+      data.type === "monthly" ||
+      data.type === "lifetime") &&
     typeof data.deviceFingerprint === "string" &&
     /^[A-F0-9]{64}$/.test(data.deviceFingerprint) &&
     typeof data.issuedAt === "string" &&
@@ -88,15 +90,28 @@ export function validateLicense(
     return { valid: true, license: payload };
   }
 
-  if (payload.expiresAt === null) {
-    return {
-      valid: false,
-      reason: "CLOCK_VERIFICATION_REQUIRED",
-    };
+  if (payload.type === "monthly") {
+    // Licenças novas recebem vencimento na primeira ativação.
+    // O prazo é verificado online pelo Supabase.
+    if (
+      payload.expiresAt !== null &&
+      Date.parse(payload.expiresAt) <= Date.parse(payload.issuedAt)
+    ) {
+      return { valid: false, reason: "INVALID_FORMAT" };
+    }
+
+    return { valid: true, license: payload };
   }
 
-  // A Trial precisa de horário online confiável.
-  // Não aprovamos uma Trial usando o relógio local.
+  // Licenças trial assinadas precisam ter vencimento.
+  if (
+    payload.expiresAt === null ||
+    Date.parse(payload.expiresAt) <= Date.parse(payload.issuedAt)
+  ) {
+    return { valid: false, reason: "INVALID_FORMAT" };
+  }
+
+  // Mantemos a política anterior para licenças trial.
   return {
     valid: false,
     reason: "CLOCK_VERIFICATION_REQUIRED",

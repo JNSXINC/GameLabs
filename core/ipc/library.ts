@@ -1,38 +1,33 @@
-import { ipcMain } from "electron";
+import { registerSecureHandler } from "./secureIpc";
+
 import {
-    loadLibrary,
-    saveLibrary,
-    addGameToLibrary,
-    updateGameInLibrary,
-    removeGameFromLibrary,
+  loadLibrary,
+  saveLibrary,
+  addGameToLibrary,
+  updateGameInLibrary,
+  removeGameFromLibrary,
 } from "../services/library/libraryStore";
 
 export function registerLibraryIpc() {
-    ipcMain.removeHandler("library:load");
-    ipcMain.removeHandler("library:save");
-    ipcMain.removeHandler("library:add");
-    ipcMain.removeHandler("library:update");
-    ipcMain.removeHandler("library:remove");
+  registerSecureHandler("library:load", async () => {
+    console.log("IPC library:load executado");
+    return loadLibrary();
+  });
 
-    ipcMain.handle("library:load", async () => {
-        console.log("IPC library:load executado");
-        return loadLibrary();
-    });
+  registerSecureHandler("library:save", async (_event, games) => {
+    console.log("IPC library:save executado");
+    return saveLibrary(games);
+  });
 
-    ipcMain.handle("library:save", async (_event, games) => {
-        console.log("IPC library:save executado");
-        return saveLibrary(games);
-    });
+  registerSecureHandler("library:add", async (_event, game) => {
+    return addGameToLibrary(game);
+  });
 
-    ipcMain.handle("library:add", async (_event, game) => {
-        return addGameToLibrary(game);
-    });
+  registerSecureHandler("library:update", async (_event, gameId, patch) => {
+    return updateGameInLibrary(gameId, patch);
+  });
 
-    ipcMain.handle("library:update", async (_event, gameId, patch) => {
-        return updateGameInLibrary(gameId, patch);
-    });
-
-    ipcMain.handle("library:remove", async (_event, gameId) => {
-        return removeGameFromLibrary(gameId);
-    });
+  registerSecureHandler("library:remove", async (_event, gameId) => {
+    return removeGameFromLibrary(gameId);
+  });
 }

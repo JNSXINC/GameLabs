@@ -1,16 +1,17 @@
-import { ipcMain } from "electron";
+import { registerSecureHandler } from "./secureIpc";
+
 import {
-    readAppSettings,
-    saveAppSettings,
-    AppSettings,
+  readAppSettings,
+  saveAppSettings,
+  AppSettings,
 } from "../services/settings/appSettings";
 
 export function registerSettingsIpc() {
-    ipcMain.handle("settings:load", async () => {
-        return readAppSettings();
-    });
+  registerSecureHandler("settings:load", async () => {
+    return readAppSettings();
+  });
 
-    ipcMain.handle("settings:save", async (_, settings: AppSettings) => {
-        return saveAppSettings(settings);
-    });
+  registerSecureHandler("settings:save", async (_, settings: AppSettings) => {
+    return saveAppSettings(settings);
+  });
 }

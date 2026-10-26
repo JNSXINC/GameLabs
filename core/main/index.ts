@@ -4,10 +4,16 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import { execFile } from "node:child_process";
 
-import { readLocalLicense } from "../services/licensing/readLocalLicense";
-import { validateLicense } from "../services/licensing/validateLicense";
-import { LICENSE_PUBLIC_KEY_PEM } from "../services/licensing/licensePublicKey";
-import { activateLicense } from "../services/licensing/activateLicense";
+import { getLicenseAccessStatus } from "../services/licensing/getLicenseAccessStatus";
+import {
+  activateLicense,
+  validateLicenseForActivation,
+} from "../services/licensing/activateLicense";
+import { checkOnlineLicense } from "../services/licensing/checkOnlineLicense";
+import { checkTrialAccess } from "../services/licensing/checkTrialAccess";
+
+import { invalidateLicenseAccessCache } from "../ipc/secureIpc";
+import { registerSecureHandler } from "../ipc/secureIpc";
 
 import { readControllerSettings } from "../services/controls/controllerSettings";
 import { registerGameScannerIpc } from "../ipc/gameScanner";
@@ -158,6 +164,7 @@ function createWindow() {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
+    fullscreen: true,
     backgroundColor: "#050b18",
     autoHideMenuBar: true,
     webPreferences: {
@@ -190,9 +197,19 @@ app.setName("GameLabs");
 
 const isTestMode = !app.isPackaged && process.env.GAMELABS_TEST_MODE === "1";
 
+const isTrialTestMode =
+  !app.isPackaged && process.env.GAMELABS_TEST_MODE === "trial";
+
 app.setPath(
   "userData",
-  path.join(app.getPath("appData"), isTestMode ? "GameLabs-Test" : "GameLabs"),
+  path.join(
+    app.getPath("appData"),
+    isTrialTestMode
+      ? "GameLabs-Trial-Test"
+      : isTestMode
+        ? "GameLabs-Test"
+        : "GameLabs",
+  ),
 );
 
 console.log("[GameLabs] Modo de teste:", isTestMode);
@@ -201,7 +218,7 @@ console.log("[GameLabs] Diretório de dados:", app.getPath("userData"));
 app.whenReady().then(async () => {
   ensureGameLabsDirectories();
 
-  if (!isTestMode) {
+  if (!isTestMode && !isTrialTestMode) {
     migrateLegacyGameLabsData();
   }
 
@@ -212,65 +229,17 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle("licensing:get-trial-status", async () => {
-    try {
-      const fingerprint = generateFingerprint();
+    const trial = await checkTrialAccess();
 
-      const response = await fetch(
-        "https://ohwmbgbkwstdybhrjmdy.supabase.co/functions/v1/trial-license",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            deviceFingerprint: fingerprint,
-            action: "check",
-          }),
-          signal: AbortSignal.timeout(10000),
-        },
-      );
-
-      const data: unknown = await response.json();
-
-      if (!response.ok) {
-        console.error(
-          "[GameLabs] Falha na consulta da Trial:",
-          response.status,
-        );
-
-        return { error: "TRIAL_VERIFICATION_FAILED" };
-      }
-
-      if (
-        !data ||
-        typeof data !== "object" ||
-        !("status" in data) ||
-        !("remainingSeconds" in data) ||
-        (data.status !== "ACTIVE" && data.status !== "EXPIRED") ||
-        typeof data.remainingSeconds !== "number" ||
-        !Number.isFinite(data.remainingSeconds) ||
-        !("startedAt" in data) ||
-        typeof data.startedAt !== "string" ||
-        !("expiresAt" in data) ||
-        typeof data.expiresAt !== "string" ||
-        !("serverTime" in data) ||
-        typeof data.serverTime !== "string"
-      ) {
-        return { error: "INVALID_TRIAL_RESPONSE" };
-      }
-
-      return {
-        status: data.status,
-        startedAt: data.startedAt,
-        expiresAt: data.expiresAt,
-        serverTime: data.serverTime,
-        remainingSeconds: data.remainingSeconds,
-      };
-    } catch (error) {
-      console.error("[GameLabs] Erro ao consultar Trial:", error);
-
-      return { error: "TRIAL_SERVER_UNAVAILABLE" };
+    if (
+      "error" in trial ||
+      trial.status !== "ACTIVE" ||
+      trial.remainingSeconds <= 0
+    ) {
+      invalidateLicenseAccessCache();
     }
+
+    return trial;
   });
 
   ipcMain.handle("licensing:start-trial", async () => {
@@ -330,36 +299,87 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle("licensing:get-status", async () => {
-    try {
-      const license = readLocalLicense();
+    const status = await getLicenseAccessStatus();
 
-      if (!license) {
-        return {
-          valid: false,
-          reason: "NO_LICENSE",
-        };
-      }
-
-      return validateLicense(
-        license,
-        generateFingerprint(),
-        LICENSE_PUBLIC_KEY_PEM,
-      );
-    } catch (error) {
-      console.error("[GameLabs] Erro ao consultar licença:", error);
-
-      return {
-        valid: false,
-        reason: "LICENSE_CHECK_FAILED",
-      };
+    if (!status.valid) {
+      invalidateLicenseAccessCache();
     }
+
+    return status;
   });
 
   ipcMain.handle("licensing:activate", async (_event, input: unknown) => {
     try {
-      return activateLicense(input);
+      // 1. Validar localmente sem salvar
+      const validation = validateLicenseForActivation(input);
+
+      if (!validation.valid) {
+        console.error(
+          "[GameLabs] Falha na validação local:",
+          validation.reason,
+        );
+
+        return validation;
+      }
+      // 2. Solicitar ativação online
+      const response = await fetch(
+        "https://bpwmjurvfijjreotxhgz.supabase.co/functions/v1/activate-license",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            license: input,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        console.error("[GameLabs] Ativação recusada:", data);
+
+        return {
+          valid: false,
+          reason: "ONLINE_ACTIVATION_FAILED",
+        };
+      }
+
+      // 3. Confirmar que a licença está ativa no servidor
+      const signedLicense = input as {
+        payload: { licenseId: string };
+        signature: string;
+      };
+
+      const onlineStatus = await checkOnlineLicense(
+        signedLicense.payload.licenseId,
+        signedLicense.signature,
+      );
+
+      if (onlineStatus !== "ACTIVE") {
+        console.error(
+          "[GameLabs] Licença não confirmada como ativa:",
+          onlineStatus,
+        );
+
+        return {
+          valid: false,
+          reason: "ONLINE_ACTIVATION_FAILED",
+        };
+      }
+
+      // 4. Salvar somente após confirmação de status ACTIVE
+      const result = activateLicense(input);
+
+      if (result.valid) {
+        invalidateLicenseAccessCache();
+        console.log("[GameLabs] Licença ativada e cache invalidado!");
+      }
+
+      return result;
     } catch (error) {
-      console.error("[GameLabs] Erro ao ativar licença:", error);
+      console.error("[GameLabs] Erro na ativação:", error);
 
       return {
         valid: false,
@@ -368,7 +388,7 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.handle("system:get-info", async () => {
+  registerSecureHandler("system:get-info", async () => {
     const cpu = os.cpus()[0]?.model || "CPU não detectada";
     const ramGb = Math.round(os.totalmem() / 1024 / 1024 / 1024);
     const gpu = await getGpuName();
@@ -383,7 +403,7 @@ app.whenReady().then(async () => {
     };
   });
 
-  ipcMain.handle("launch-game", async (_, game) => {
+  registerSecureHandler("launch-game", async (_, game) => {
     try {
       const child = await launchGame(game);
 
@@ -416,7 +436,7 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.handle("open-game-folder", async (_, gamePath: string) => {
+  registerSecureHandler("open-game-folder", async (_, gamePath: string) => {
     try {
       if (!gamePath) {
         return { success: false, error: "Caminho não informado." };
@@ -437,7 +457,7 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.handle("check-game-path", async (_, gamePath: string) => {
+  registerSecureHandler("check-game-path", async (_, gamePath: string) => {
     try {
       if (!gamePath) return { exists: false };
 
@@ -449,7 +469,7 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.handle("select-game-executable", async () => {
+  registerSecureHandler("select-game-executable", async () => {
     const result = await dialog.showOpenDialog({
       title: "Selecione o executável do jogo",
       properties: ["openFile"],
@@ -466,7 +486,7 @@ app.whenReady().then(async () => {
     };
   });
 
-  ipcMain.handle("select-game-file", async () => {
+  registerSecureHandler("select-game-file", async () => {
     const result = await dialog.showOpenDialog({
       title: "Selecione o arquivo do jogo",
       properties: ["openFile"],
@@ -507,7 +527,7 @@ app.whenReady().then(async () => {
     };
   });
 
-  ipcMain.handle("select-bios-file", async () => {
+  registerSecureHandler("select-bios-file", async () => {
     const result = await dialog.showOpenDialog({
       title: "Selecione o arquivo BIOS",
       properties: ["openFile"],
@@ -533,7 +553,7 @@ app.whenReady().then(async () => {
     };
   });
 
-  ipcMain.handle("emulators:migrate", async (_, sourcePath: string) => {
+  registerSecureHandler("emulators:migrate", async (_, sourcePath: string) => {
     try {
       if (typeof sourcePath !== "string" || !sourcePath.trim()) {
         throw new Error("Diretório de origem inválido.");

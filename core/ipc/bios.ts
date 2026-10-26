@@ -1,19 +1,24 @@
-import { ipcMain, dialog, shell } from "electron";
+import { dialog, shell } from "electron";
 import fs from "node:fs";
 import path from "path";
+
+import { registerSecureHandler } from "./secureIpc";
 import { getGameLabsDataPath } from "../services/storage/appPaths";
+
 import {
   loadBiosConfigs,
   updateBiosPath,
 } from "../services/emulators/bios/biosManager";
+
 import {
   getBiosRegionStatus,
   getBiosStatus,
 } from "../services/emulators/bios/getBiosStatus";
+
 import { BiosPlatform, BiosRegion } from "../services/emulators/bios/biosTypes";
 
 export function registerBiosIpc() {
-  ipcMain.handle("bios:list", async () => {
+  registerSecureHandler("bios:list", async () => {
     const configs = loadBiosConfigs();
 
     return configs.map((bios) => ({
@@ -26,7 +31,7 @@ export function registerBiosIpc() {
     }));
   });
 
-  ipcMain.handle(
+  registerSecureHandler(
     "bios:select",
     async (_, platform: BiosPlatform, region?: BiosRegion) => {
       const result = await dialog.showOpenDialog({
@@ -56,7 +61,7 @@ export function registerBiosIpc() {
     },
   );
 
-  ipcMain.handle("bios:open-folder", async (_, biosPath?: string) => {
+  registerSecureHandler("bios:open-folder", async (_, biosPath?: string) => {
     if (!biosPath) {
       const folder = path.join(getGameLabsDataPath(), "bios");
 

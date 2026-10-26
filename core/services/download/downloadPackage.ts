@@ -1,11 +1,13 @@
 import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
+import { app } from "electron";
 import { extractFull } from "node-7z";
 import sevenZipBin from "7zip-bin";
 
 import { DownloadablePackage } from "./downloadablePackage";
 import { downloadFile } from "./downloadFile";
+import { installRetroArchCores } from "./installRetroArchCores";
 import { resolveStaticUrl } from "./resolvers/staticUrlResolver";
 import { resolveGithubLatestReleaseUrl } from "./resolvers/githubReleaseResolver";
 
@@ -133,8 +135,12 @@ export async function downloadPackage(
     zip.extractAllTo(installDir, true);
   } else if (packageConfig.archiveType === "7z") {
     await new Promise<void>((resolve, reject) => {
+      const sevenZipExecutable = app.isPackaged
+        ? sevenZipBin.path7za.replace(/app\.asar(?=[\\/])/, "app.asar.unpacked")
+        : sevenZipBin.path7za;
+
       const stream = extractFull(archivePath, installDir, {
-        $bin: sevenZipBin.path7za,
+        $bin: sevenZipExecutable,
       });
 
       stream.on("end", () => resolve());
@@ -155,6 +161,14 @@ export async function downloadPackage(
     throw new Error(
       `Executável não encontrado após extração de ${packageConfig.name}.`,
     );
+  }
+
+  if (packageConfig.id === "retroarch") {
+    console.log("[RetroArch] Instalando núcleos necessários...");
+
+    onStatus?.("extracting");
+
+    await installRetroArchCores(executablePath);
   }
 
   console.log(

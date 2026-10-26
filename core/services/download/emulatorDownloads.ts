@@ -59,7 +59,7 @@ export const emulatorDownloads: DownloadablePackage[] = [
     executableCandidates: ["retroarch.exe"],
     resolver: {
       type: "static",
-      url: "https://buildbot.libretro.com/nightly/windows/x86_64/RetroArch.7z",
+      url: "https://buildbot.libretro.com/stable/1.22.2/windows/x86_64/RetroArch.7z",
     },
   },
 ];

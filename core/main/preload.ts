@@ -88,6 +88,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return ipcRenderer.invoke("downloads:emulator", emulatorId);
   },
 
+  detectInstalledEmulators: async (): Promise<
+    { id: string; executablePath: string }[]
+  > => {
+    return ipcRenderer.invoke("emulators:detect-installed");
+  },
+
   migrateEmulators: async (sourcePath: string) => {
     return ipcRenderer.invoke("emulators:migrate", sourcePath);
   },

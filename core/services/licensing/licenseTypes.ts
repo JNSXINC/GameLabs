@@ -1,4 +1,4 @@
-export type LicenseType = "trial" | "lifetime";
+export type LicenseType = "trial" | "monthly" | "lifetime";
 
 export type LicensePayload = {
   schemaVersion: 1;

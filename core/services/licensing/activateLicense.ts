@@ -2,13 +2,18 @@ import { generateFingerprint } from "./generateFingerprint";
 import { validateLicense } from "./validateLicense";
 import { writeLocalLicense } from "./writeLocalLicense";
 import { LICENSE_PUBLIC_KEY_PEM } from "./licensePublicKey";
-
 import type { LicenseValidationResult } from "./licenseTypes";
 
-export function activateLicense(input: unknown): LicenseValidationResult {
+export function validateLicenseForActivation(
+  input: unknown,
+): LicenseValidationResult {
   const fingerprint = generateFingerprint();
 
-  const result = validateLicense(input, fingerprint, LICENSE_PUBLIC_KEY_PEM);
+  return validateLicense(input, fingerprint, LICENSE_PUBLIC_KEY_PEM);
+}
+
+export function activateLicense(input: unknown): LicenseValidationResult {
+  const result = validateLicenseForActivation(input);
 
   if (!result.valid) {
     return result;

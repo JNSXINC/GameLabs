@@ -57,7 +57,7 @@ export function ensureGameLabsDirectories(): void {
 }
 
 export function migrateLegacyGameLabsData(): void {
-  const legacyDataPath = path.join(process.cwd(), "data");
+  const legacyDataPath = path.join(app.getAppPath(), "data");
 
   const newDataPath = getGameLabsDataPath();
 
