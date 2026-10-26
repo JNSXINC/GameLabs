@@ -11,3 +11,13 @@ controlls_config/
 # Ferramentas instaladas localmente pelo GameLabs
 /Controls/
 /admin-tools/private-keys/
+# Configurações locais do Supabase
+.env.local
+.env.*.local
+# Configurações locais de controles
+/config/controllers.json
+/data/preferences/controllers.json
+/controllers.json
+# Dados locais da biblioteca e BIOS
+/data/metadata/games.json
+/data/preferences/bios.json
