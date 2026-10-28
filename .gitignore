@@ -21,3 +21,4 @@ controlls_config/
 # Dados locais da biblioteca e BIOS
 /data/metadata/games.json
 /data/preferences/bios.json
+/certificates/
