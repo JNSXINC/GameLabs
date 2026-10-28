@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-
-type Screen = "library" | "favorites" | "browse" | "settings" | "user";
+import type { Screen } from "../../types/screen";
 
 type Props = {
   screen: Screen;

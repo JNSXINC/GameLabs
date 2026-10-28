@@ -134,6 +134,13 @@ function App() {
           return;
         }
 
+        if (!result.valid && result.reason === "LICENSE_REVOKED") {
+          setAccessType(null);
+          setActivationError("Esta licença foi revogada.");
+          setPreviewActivation(true);
+          return;
+        }
+
         {
           const trial = await window.electronAPI.getTrialStatus();
 
@@ -325,7 +332,7 @@ function App() {
       checking = true;
 
       try {
-        const result = await window.electronAPI.startTrial();
+        const result = await window.electronAPI.getTrialStatus();
 
         if (!active) return;
 

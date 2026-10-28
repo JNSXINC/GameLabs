@@ -4,7 +4,8 @@ import { supabase } from "../services/auth/supabaseClient.mjs";
 
 type License = {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  holder_name: string | null;
   license_type: "monthly" | "lifetime";
   device_fingerprint: string | null;
   status: "pending" | "active" | "revoked";
@@ -28,7 +29,8 @@ type SignedLicense = {
 
 type LicenseDetails = {
   id: string;
-  userId: string;
+  userId: string | null;
+  holderName: string | null;
   licenseType: "monthly" | "lifetime";
   deviceFingerprint: string | null;
   status: "pending" | "active" | "revoked";
@@ -164,7 +166,7 @@ async function requestLicenses(): Promise<License[]> {
 }
 
 async function requestCreateLicense(input: {
-  userId: string;
+  holderName: string;
   licenseType: License["license_type"];
   deviceFingerprint: string;
 }): Promise<SignedLicense> {
@@ -374,7 +376,7 @@ function AdminApp() {
     useState<LicenseDetailsResponse | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
-  const [newUserId, setNewUserId] = useState("");
+  const [newHolderName, setNewHolderName] = useState("");
   const [newLicenseType, setNewLicenseType] =
     useState<License["license_type"]>("monthly");
   const [newFingerprint, setNewFingerprint] = useState("");
@@ -500,15 +502,11 @@ function AdminApp() {
   async function handleCreateLicense(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const userId = newUserId.trim();
+    const holderName = newHolderName.trim();
     const deviceFingerprint = newFingerprint.trim();
 
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        userId,
-      )
-    ) {
-      setMessage("Informe um UUID de usuário válido.");
+    if (!holderName || holderName.length > 120) {
+      setMessage("Informe o nome do titular (até 120 caracteres).");
       return;
     }
 
@@ -524,11 +522,10 @@ function AdminApp() {
 
     try {
       const signedLicense = await requestCreateLicense({
-        userId,
+        holderName,
         licenseType: newLicenseType,
         deviceFingerprint,
       });
-
       setIssuedLicense(signedLicense);
       setMessage(
         "Licença assinada emitida! Copie o JSON abaixo e guarde em local seguro.",
@@ -777,13 +774,14 @@ function AdminApp() {
                 style={{ display: "grid", gap: 14 }}
               >
                 <label style={{ display: "grid", gap: 6 }}>
-                  UUID do usuário (Supabase Auth)
+                  Nome do titular
                   <input
                     style={inputStyle}
                     required
-                    value={newUserId}
-                    onChange={(event) => setNewUserId(event.target.value)}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    maxLength={120}
+                    value={newHolderName}
+                    onChange={(event) => setNewHolderName(event.target.value)}
+                    placeholder="Nome completo do cliente"
                   />
                 </label>
 
@@ -907,7 +905,8 @@ function AdminApp() {
                 >
                   {[
                     ["ID", selectedLicense.license.id],
-                    ["Usuário", selectedLicense.license.userId],
+                    ["Usuário", selectedLicense.license.userId ?? "—"],
+                    ["Titular", selectedLicense.license.holderName ?? "—"],
                     [
                       "Tipo",
                       selectedLicense.license.licenseType === "monthly"
@@ -1115,6 +1114,7 @@ function AdminApp() {
                       <tr style={{ color: "#9ca3af" }}>
                         <th style={cellStyle}>ID</th>
                         <th style={cellStyle}>Usuário</th>
+                        <th style={cellStyle}>Titular</th>
                         <th style={cellStyle}>Tipo</th>
                         <th style={cellStyle}>Status</th>
                         <th style={cellStyle}>Emissão</th>
@@ -1139,8 +1139,17 @@ function AdminApp() {
                               {license.id.slice(0, 8)}...
                             </td>
 
-                            <td style={cellStyle} title={license.user_id}>
-                              {license.user_id.slice(0, 8)}...
+                            <td
+                              style={cellStyle}
+                              title={license.user_id ?? "Sem conta vinculada"}
+                            >
+                              {license.user_id
+                                ? `${license.user_id.slice(0, 8)}...`
+                                : "—"}
+                            </td>
+
+                            <td style={{ ...cellStyle, whiteSpace: "normal" }}>
+                              {license.holder_name ?? "—"}
                             </td>
 
                             <td style={cellStyle}>

@@ -102,7 +102,7 @@ declare global {
             license: {
               schemaVersion: 1;
               licenseId: string;
-              type: "trial" | "lifetime";
+              type: "trial" | "monthly" | "lifetime";
               deviceFingerprint: string;
               issuedAt: string;
               expiresAt: string | null;
@@ -120,7 +120,7 @@ declare global {
             license: {
               schemaVersion: 1;
               licenseId: string;
-              type: "trial" | "lifetime";
+              type: "trial" | "monthly" | "lifetime";
               deviceFingerprint: string;
               issuedAt: string;
               expiresAt: string | null;
@@ -202,6 +202,7 @@ declare global {
         watchdogDS4: boolean;
         closeWithGameLabs: boolean;
         ds4Path: string;
+        inputDevice: "keyboard1" | "keyboard2" | "controller";
       }>;
 
       saveControllerSettings: (settings: {
@@ -209,6 +210,7 @@ declare global {
         watchdogDS4: boolean;
         closeWithGameLabs: boolean;
         ds4Path: string;
+        inputDevice: "keyboard1" | "keyboard2" | "controller";
       }) => Promise<boolean>;
 
       selectDS4Executable: () => Promise<{
