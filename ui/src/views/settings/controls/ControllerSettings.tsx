@@ -5,6 +5,7 @@ type ControllerSettingsData = {
   watchdogDS4: boolean;
   closeWithGameLabs: boolean;
   ds4Path: string;
+  inputDevice: "keyboard1" | "keyboard2" | "controller";
 };
 
 const defaultSettings: ControllerSettingsData = {
@@ -12,6 +13,7 @@ const defaultSettings: ControllerSettingsData = {
   watchdogDS4: false,
   closeWithGameLabs: false,
   ds4Path: "",
+  inputDevice: "keyboard1",
 };
 
 export default function ControllerSettings() {
@@ -128,6 +130,75 @@ export default function ControllerSettings() {
       style={{ padding: 32, color: "#fff" }}
     >
       <h2>Controles</h2>
+
+      <div style={{ marginTop: 24, marginBottom: 28 }}>
+        <h3>Dispositivo de entrada</h3>
+
+        <p style={{ opacity: 0.7 }}>
+          Selecione o modo de entrada para jogos emulados. Jogos de PC utilizam
+          seus próprios controles.
+        </p>
+
+        <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+          {[
+            {
+              id: "keyboard1",
+              name: "Teclado 1 — Padrão",
+              description: "Teclado e mouse para jogos emulados.",
+            },
+            {
+              id: "keyboard2",
+              name: "Teclado 2 — Shooter",
+              description: "Mouse esquerdo = L1 e mouse direito = R1.",
+            },
+            {
+              id: "controller",
+              name: "Controle",
+              description: "Utilizar controle com a integração DS4Windows.",
+            },
+          ].map((option) => (
+            <label
+              key={option.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: 16,
+                borderRadius: 12,
+                border:
+                  settings.inputDevice === option.id
+                    ? "1px solid #7c8cff"
+                    : "1px solid rgba(255,255,255,0.15)",
+                background:
+                  settings.inputDevice === option.id
+                    ? "rgba(124,140,255,0.12)"
+                    : "rgba(255,255,255,0.04)",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="radio"
+                name="inputDevice"
+                value={option.id}
+                checked={settings.inputDevice === option.id}
+                onChange={() =>
+                  updateSetting(
+                    "inputDevice",
+                    option.id as ControllerSettingsData["inputDevice"],
+                  )
+                }
+              />
+
+              <div>
+                <strong>{option.name}</strong>
+                <div style={{ opacity: 0.7, marginTop: 4 }}>
+                  {option.description}
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
 
       <p style={{ opacity: 0.7 }}>
         Configure a integração do GameLabs com o DS4Windows.

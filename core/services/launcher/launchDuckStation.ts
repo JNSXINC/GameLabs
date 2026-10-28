@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { applyPerformanceProfile } from "../settings/applyPerformanceProfile";
+import { applyDuckStationInputProfile } from "../controls/duckStationInputProfiles";
 
 type Game = {
   title: string;
@@ -26,6 +27,8 @@ export async function launchDuckStation(game: Game) {
   if (!fs.existsSync(game.gameFilePath)) {
     throw new Error("ISO/ROM do PS1 não encontrada.");
   }
+
+  applyDuckStationInputProfile();
 
   const performanceProfile = applyPerformanceProfile(
     "duckstation",

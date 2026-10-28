@@ -7,6 +7,7 @@ export type ControllerSettings = {
   watchdogDS4: boolean;
   closeWithGameLabs: boolean;
   ds4Path: string;
+  inputDevice: "keyboard1" | "keyboard2" | "controller";
 };
 
 export const defaultControllerSettings: ControllerSettings = {
@@ -14,6 +15,7 @@ export const defaultControllerSettings: ControllerSettings = {
   watchdogDS4: false,
   closeWithGameLabs: false,
   ds4Path: "",
+  inputDevice: "keyboard1",
 };
 
 export function getControllerSettingsPath(): string {

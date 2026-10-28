@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { applyPerformanceProfile } from "../settings/applyPerformanceProfile";
+import { applyPCSX2InputProfile } from "../controls/pcsx2InputProfiles";
 
 type Game = {
   title: string;
@@ -40,6 +41,10 @@ export async function launchPCSX2(game: Game) {
       error,
     );
   }
+
+  const inputProfile = applyPCSX2InputProfile();
+
+  console.log("[PCSX2] Perfil de entrada:", inputProfile);
 
   const child = spawn(
     game.emulatorExecutablePath,
