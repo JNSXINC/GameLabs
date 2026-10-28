@@ -1,7 +1,7 @@
 {
   "name": "gamelabs",
   "productName": "GameLabs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Launcher de jogos estilo console",
   "main": "dist-electron/main/index.js",

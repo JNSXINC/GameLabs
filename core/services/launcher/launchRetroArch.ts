@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { app } from "electron";
 
 import { applyPerformanceProfile } from "../settings/applyPerformanceProfile";
 import { readControllerSettings } from "../controls/controllerSettings";
@@ -73,7 +74,29 @@ export async function launchRetroArch(game: Game) {
     );
 
     if (!fs.existsSync(keyboardProfile)) {
-      throw new Error("Perfil de teclado do RetroArch não encontrado.");
+      const bundledProfile = app.isPackaged
+        ? path.join(
+            process.resourcesPath,
+            "templates",
+            "RetroArch",
+            "GameLabs-Teclado1.cfg",
+          )
+        : path.join(
+            app.getAppPath(),
+            "core",
+            "services",
+            "controls",
+            "templates",
+            "RetroArch",
+            "GameLabs-Teclado1.cfg",
+          );
+
+      if (!fs.existsSync(bundledProfile)) {
+        throw new Error("Perfil de teclado do RetroArch não encontrado.");
+      }
+
+      fs.mkdirSync(path.dirname(keyboardProfile), { recursive: true });
+      fs.copyFileSync(bundledProfile, keyboardProfile);
     }
 
     args.push("--appendconfig", keyboardProfile);
