@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type ActivationViewProps = {
   onActivate: (license: string) => Promise<void>;
@@ -16,6 +16,43 @@ export default function ActivationView({
   startingTrial = false,
 }: ActivationViewProps) {
   const [license, setLicense] = useState("");
+  const [fingerprint, setFingerprint] = useState("");
+  const [fingerprintError, setFingerprintError] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    window.electronAPI
+      .getDeviceFingerprint()
+      .then((value: string) => {
+        if (mounted) {
+          if (typeof value === "string" && value.length === 64) {
+            setFingerprint(value);
+          } else {
+            setFingerprintError(true);
+          }
+        }
+      })
+      .catch(() => {
+        if (mounted) setFingerprintError(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleCopyFingerprint = async () => {
+    if (!fingerprint) return;
+
+    try {
+      await navigator.clipboard.writeText(fingerprint);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -136,33 +173,102 @@ export default function ActivationView({
             style={{
               color: "#94a3b8",
               fontSize: 13,
-              marginBottom: 14,
+              marginBottom: 12,
             }}
           >
-            Ainda não possui uma licença?
+            Identificação deste computador
           </p>
+
+          <div
+            style={{
+              padding: 12,
+              background: "#080f1e",
+              border: "1px solid #334155",
+              borderRadius: 10,
+              fontFamily: "monospace",
+              fontSize: 11,
+              color: "#cbd5e1",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {fingerprint ||
+              (fingerprintError
+                ? "Não foi possível identificar este computador."
+                : "Identificando computador...")}
+          </div>
 
           <button
             type="button"
-            onClick={onStartTrial}
-            disabled={startingTrial || activating}
+            disabled={!fingerprint}
+            onClick={handleCopyFingerprint}
             style={{
               width: "100%",
-              padding: 14,
+              padding: 12,
+              marginTop: 10,
               borderRadius: 10,
               border: "1px solid #334155",
-              background: "#1e293b",
+              background: "#1e3a8a",
               color: "#fff",
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: 700,
-              cursor: startingTrial ? "wait" : "pointer",
-              opacity: startingTrial || activating ? 0.5 : 1,
+              cursor: fingerprint ? "pointer" : "not-allowed",
+              opacity: fingerprint ? 1 : 0.5,
             }}
           >
-            {startingTrial
-              ? "Verificando período gratuito..."
-              : "Experimentar grátis por 1 hora"}
+            {copied ? "Fingerprint copiado!" : "Copiar fingerprint"}
           </button>
+
+          <p
+            style={{
+              color: "#94a3b8",
+              fontSize: 12,
+              lineHeight: 1.6,
+              marginTop: 12,
+            }}
+          >
+            Para solicitar sua licença, envie este identificador ao responsável
+            pelo GameLabs.
+          </p>
+
+          <div
+            style={{
+              marginTop: 24,
+              paddingTop: 24,
+              borderTop: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: 13,
+                marginBottom: 14,
+              }}
+            >
+              Ainda não possui uma licença?
+            </p>
+
+            <button
+              type="button"
+              onClick={onStartTrial}
+              disabled={startingTrial || activating}
+              style={{
+                width: "100%",
+                padding: 14,
+                borderRadius: 10,
+                border: "1px solid #334155",
+                background: "#1e293b",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: startingTrial ? "wait" : "pointer",
+                opacity: startingTrial || activating ? 0.5 : 1,
+              }}
+            >
+              {startingTrial
+                ? "Verificando período gratuito..."
+                : "Experimentar grátis por 1 hora"}
+            </button>
+          </div>
         </div>
 
         <p
