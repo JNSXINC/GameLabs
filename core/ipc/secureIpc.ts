@@ -28,6 +28,10 @@ async function verifyAccess(): Promise<number> {
     return Date.now() + CACHE_DURATION_MS;
   }
 
+  if (!license.valid && license.reason === "LICENSE_REVOKED") {
+    return 0;
+  }
+
   const trial = await checkTrialAccess();
 
   if (
