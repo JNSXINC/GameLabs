@@ -13,6 +13,7 @@ import { resolveGithubLatestReleaseUrl } from "./resolvers/githubReleaseResolver
 
 import {
   getEmulatorsInstallPath,
+  getControlsInstallPath,
   getDownloadsTempPath,
 } from "../storage/appPaths";
 
@@ -96,15 +97,29 @@ export async function downloadPackage(
   if (
     path.posix.isAbsolute(installFolder) ||
     path.win32.isAbsolute(installFolder) ||
-    installFolder.split("/").includes("..") ||
-    !installFolder.startsWith("Emulators/")
+    installFolder.split("/").includes("..")
   ) {
     throw new Error("Diretório de instalação inválido.");
   }
 
-  const emulatorFolder = installFolder.slice("Emulators/".length);
+  let installDir: string;
 
-  const installDir = path.join(getEmulatorsInstallPath(), emulatorFolder);
+  if (installFolder.startsWith("Emulators/")) {
+    const emulatorFolder = installFolder.slice("Emulators/".length);
+
+    if (!emulatorFolder || emulatorFolder.split("/").includes("")) {
+      throw new Error("Diretório de instalação inválido.");
+    }
+
+    installDir = path.join(getEmulatorsInstallPath(), emulatorFolder);
+  } else if (
+    packageConfig.id === "ds4windows" &&
+    installFolder === "Controls/DS4Windows"
+  ) {
+    installDir = path.join(getControlsInstallPath(), "DS4Windows");
+  } else {
+    throw new Error("Diretório de instalação inválido.");
+  }
 
   const tempDir = getDownloadsTempPath();
 

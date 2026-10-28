@@ -37,6 +37,10 @@ export function getEmulatorsInstallPath(): string {
   return path.join(getGameLabsInstallPath(), "Emulators");
 }
 
+export function getControlsInstallPath(): string {
+  return path.join(getGameLabsInstallPath(), "Controls");
+}
+
 export function getDownloadsTempPath(): string {
   return path.join(getGameLabsInstallPath(), "temp", "downloads");
 }
@@ -48,6 +52,7 @@ export function ensureGameLabsDirectories(): void {
     getLibraryDataPath(),
     getUserDataPath(),
     getEmulatorsInstallPath(),
+    getControlsInstallPath(),
     getDownloadsTempPath(),
   ];
 
