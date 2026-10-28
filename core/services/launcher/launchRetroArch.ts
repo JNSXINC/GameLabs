@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { applyPerformanceProfile } from "../settings/applyPerformanceProfile";
+import { readControllerSettings } from "../controls/controllerSettings";
 
 type Game = {
   title: string;
@@ -60,16 +61,34 @@ export async function launchRetroArch(game: Game) {
     performanceProfile,
   );
 
-  const child = spawn(
-    game.emulatorExecutablePath,
-    ["--fullscreen", "-L", corePath, game.gameFilePath],
-    {
-      detached: false,
-      stdio: "ignore",
-      windowsHide: false,
-      cwd: retroArchFolder,
-    },
-  );
+  const { inputDevice } = readControllerSettings();
+
+  const args = ["--fullscreen"];
+
+  if (inputDevice !== "controller") {
+    const keyboardProfile = path.join(
+      retroArchFolder,
+      "GameLabs-Profiles",
+      "GameLabs-Teclado1.cfg",
+    );
+
+    if (!fs.existsSync(keyboardProfile)) {
+      throw new Error("Perfil de teclado do RetroArch não encontrado.");
+    }
+
+    args.push("--appendconfig", keyboardProfile);
+  }
+
+  args.push("-L", corePath, game.gameFilePath);
+
+  console.log(`[GameLabs] RetroArch iniciado com modo: ${inputDevice}`);
+
+  const child = spawn(game.emulatorExecutablePath, args, {
+    detached: false,
+    stdio: "ignore",
+    windowsHide: false,
+    cwd: retroArchFolder,
+  });
 
   return child;
 }
